@@ -563,8 +563,25 @@ function renderParent(){ const sid=document.getElementById('parentPick').value; 
     +'<h4 style="margin:10px 0 4px">Grades</h4>'+(rows||'<p class="muted">No grades yet.</p>')+'</div>'; }
 
 /* === Firebase Live Sync (Phase 2) === */
+/* Tolerant config parser: accepts BOTH pure JSON and the Firebase console
+   JS snippet (with // comments, `const firebaseConfig =`, unquoted keys). */
+function parseConfig(raw){
+  let t = raw || '';
+  t = t.replace(/\/\*[\s\S]*?\*\//g, '');      // block comments
+  t = t.replace(/\/\/.*$/gm, '');              // line comments
+  t = t.replace(/^\s*(export )?(const|let|var)\s+\w+\s*=\s*/, ''); // `const x =`
+  t = t.replace(/;\s*$/g, '');
+  const m = t.match(/\{[\s\S]*\}/);
+  if(!m) return null;
+  try{
+    const cfg = new Function('return (' + m[0] + ')')();
+    if(cfg && typeof cfg==='object' && cfg.apiKey && cfg.projectId) return cfg;
+  }catch(e){}
+  return null;
+}
 function connectFirebase(){ const raw=document.getElementById('fbConfig').value.trim(); if(!raw){ toast('Paste config first'); return; }
-  try{ const cfg=JSON.parse(raw); if(!cfg.apiKey||!cfg.projectId) throw 0; localStorage.setItem(Sync.CFG_KEY, JSON.stringify(cfg)); localStorage.removeItem(Sync.DISABLED_KEY); toast('Config saved — restarting sync'); }catch(e){ toast('Invalid config JSON (need apiKey+projectId)'); return; }
+  const cfg=parseConfig(raw); if(!cfg){ toast('Invalid config — paste the full Firebase config object'); return; }
+  localStorage.setItem(Sync.CFG_KEY, JSON.stringify(cfg)); localStorage.removeItem(Sync.DISABLED_KEY); toast('Config saved — connecting…');
   if(window.Sync && Sync.init()){ Sync.start(()=> (DB.students.length===0 && DB.classes.length===0), ()=>{ syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }); syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }
   else toast('Firebase SDK failed to load (offline?)'); }
 function disconnectFirebase(){ if(window.Sync) Sync.stop(); localStorage.setItem(Sync.DISABLED_KEY,'1'); syncOn=false; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🔴 Local only (sync disabled)'; toast('Disconnected — local only'); }
