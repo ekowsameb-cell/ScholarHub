@@ -171,6 +171,7 @@
           <button class="btn green" onclick="connectFirebase()">🔗 Connect</button>
           <button class="btn ghost" onclick="disconnectFirebase()">Disconnect</button>
           <button class="btn ghost" onclick="testFirebase()">Test</button>
+          <button class="btn ghost" onclick="useEmbeddedConfig()">↺ Use Built-in</button>
         </div>
       </div>
       <div class="ticket" style="border-left-color:var(--warn)">
@@ -585,6 +586,7 @@ function connectFirebase(){ const raw=document.getElementById('fbConfig').value.
   if(window.Sync && Sync.init()){ Sync.start(()=> (DB.students.length===0 && DB.classes.length===0), ()=>{ syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }); syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }
   else toast('Firebase SDK failed to load (offline?)'); }
 function disconnectFirebase(){ if(window.Sync) Sync.stop(); localStorage.setItem(Sync.DISABLED_KEY,'1'); syncOn=false; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🔴 Local only (sync disabled)'; toast('Disconnected — local only'); }
+function useEmbeddedConfig(){ localStorage.removeItem(Sync.CFG_KEY); localStorage.removeItem(Sync.DISABLED_KEY); toast('Cleared override — using built-in config'); if(window.Sync && Sync.init()){ Sync.start(()=> (DB.students.length===0 && DB.classes.length===0), ()=>{ syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }); syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; } else toast('Firebase SDK failed to load (offline?)'); }
 function testFirebase(){ if(!window.Sync||!Sync.enabled()){ toast('No config stored'); return; } toast('Config present: '+(Sync.config().projectId||'?')); }
 
 /* === Global Search (RBAC polish) === */
