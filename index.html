@@ -126,6 +126,7 @@
   <button class="rolebtn" style="border-color:var(--principal)" onclick="pickRole('principal')"><span>📊 Principal<small>Dashboard &amp; analytics</small></span></button>
   <button class="rolebtn" style="border-color:var(--parent)" onclick="pickRole('parent')"><span>👪 Parent<small>Portal (demo PIN)</small></span></button>
   <p class="small muted" style="text-align:center;margin-top:16px">Offline-first. Works without internet. ⚡ Powered by <b>Providers Consultancy</b></p>
+  <div style="text-align:center;margin-top:6px"><button class="btn ghost sm" onclick="document.getElementById('importFileLaunch').click()">⬆ Import existing data file</button><input type="file" id="importFileLaunch" accept="application/json" style="display:none" onchange="importData(this.files[0])"></div>
 </div>
 
 <!-- APP -->
@@ -151,6 +152,7 @@
       <div class="tab" data-av="att" onclick="switchA('att')">Timetable</div>
       <div class="tab" data-av="arep" onclick="switchA('arep')">Reports</div>
       <div class="tab" data-av="astaff" onclick="switchA('astaff')">Staff/HR</div>
+      <div class="tab" data-av="async" onclick="switchA('async')">Data Sync</div>
     </div>
     <div class="view on" id="av-asetup"><div id="adminProfile"></div></div>
     <div class="view" id="av-aadm"><div class="row"><button class="btn" onclick="openAdmit()">+ New Admission</button></div><div id="admitList"></div></div>
@@ -159,6 +161,18 @@
     <div class="view" id="av-att"><div id="timetableEditor"></div></div>
     <div class="view" id="av-arep"><div class="row"><button class="btn green" onclick="compileReports()">📄 Generate Term Reports (all students)</button><button class="btn ghost" onclick="downloadAllReports()">⬇ Download ZIP-less bundle</button></div><div id="reportOut"></div></div>
     <div class="view" id="av-astaff"><div class="row"><button class="btn" onclick="openStaff()">+ Add Staff</button></div><div id="staffList"></div></div>
+    <div class="view" id="av-async">
+      <div class="ticket" style="border-left-color:var(--warn)">
+        <h3 style="margin-top:0">Data Sync (offline, no cloud)</h3>
+        <p class="small muted">ScholarHub stores data on this device only. To share across devices: the <b>Admin</b> exports the master file, then other devices <b>Import</b> it. Re-import after any major change. (Live auto-sync = Phase 2 / Firebase.)</p>
+        <div class="row">
+          <button class="btn green" onclick="exportData()">⬇ Export Master (JSON)</button>
+          <button class="btn" onclick="document.getElementById('importFile').click()">⬆ Import Master</button>
+          <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(this.files[0])">
+        </div>
+        <p class="small muted" style="margin-top:10px">Tip: keep one device as the source of truth (e.g. the Admin phone). Others import from it.</p>
+      </div>
+    </div>
   </div>
 
   <!-- TEACHER -->
@@ -365,7 +379,7 @@ function goLaunch(){ document.getElementById('app').classList.add('hidden'); doc
 
 /* === ADMIN === */
 function switchA(v){ document.querySelectorAll('[data-av]').forEach(t=>t.classList.toggle('on',t.getAttribute('data-av')===v)); document.querySelectorAll('#role-admin .view').forEach(x=>x.classList.remove('on')); document.getElementById('av-'+v).classList.add('on');
-  if(v==='asetup') renderProfile(); if(v==='aadm') renderAdmissions(); if(v==='aclass') renderClasses(); if(v==='asubj') renderSubjects(); if(v==='att') renderTimetable(); if(v==='astaff') renderStaff(); if(v==='arep') document.getElementById('reportOut').innerHTML=''; }
+  if(v==='asetup') renderProfile(); if(v==='aadm') renderAdmissions(); if(v==='aclass') renderClasses(); if(v==='asubj') renderSubjects(); if(v==='att') renderTimetable(); if(v==='astaff') renderStaff(); if(v==='arep') document.getElementById('reportOut').innerHTML=''; if(v==='async'){} }
 function renderProfile(){ const p=DB.schoolProfile; document.getElementById('adminProfile').innerHTML=
   '<div class="ticket"><h3 style="margin-top:0">School Profile</h3>'
   +'<label class="small muted">School name</label><input id="pName" value="'+esc(p.schoolName)+'">'
@@ -442,6 +456,10 @@ function saveStaff(){ const id=document.getElementById('stId').value.trim(); if(
   save(); closeModal('staffModal'); renderStaff(); toast('Staff added'); }
 function renderStaff(){ const el=document.getElementById('staffList'); if(!DB.staff.length){ el.innerHTML='<p class="muted">No staff yet.</p>'; return; }
   el.innerHTML=DB.staff.map(s=>'<div class="ticket"><div class="top"><span class="tt">'+esc(s.staffId)+'</span><span class="muted">'+esc(s.role)+'</span></div><div class="small muted">Salary '+money(s.salary)+' · Leave '+s.leaveDays+'d</div></div>').join(''); }
+
+/* Export / Import master (multi-device stopgap) */
+function exportData(){ const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ScholarHub-data-'+new Date().toISOString().slice(0,10)+'.json'; a.click(); toast('Exported master file'); }
+function importData(file){ if(!file) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d||!d.students) throw new Error('not a ScholarHub file'); DB=Object.assign(defaultDB(), d); save(); toast('Imported — reload views'); }catch(e){ toast('Invalid file'); } }; r.readAsText(file); }
 
 /* === TEACHER === */
 function switchT(v){ document.querySelectorAll('[data-tv]').forEach(t=>t.classList.toggle('on',t.getAttribute('data-tv')===v)); document.querySelectorAll('#role-teacher .view').forEach(x=>x.classList.remove('on')); document.getElementById('tv-'+v).classList.add('on'); if(v==='tatt') renderTeacherAtt(); if(v==='tgb') openGradebook(); }
