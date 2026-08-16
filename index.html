@@ -335,9 +335,10 @@
 
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/chart.umd.min.js"></script>
-<!-- Firebase compat SDK (only used if you Connect Firebase; app works without it) -->
+<!-- Firebase compat SDK (only used if sync is connected; app works without it) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="sync.js"></script>
 <script>
 /* ===== ScholarHub ERP (offline-first PWA, Path A). Evolved from SchoolLedger.
@@ -563,10 +564,10 @@ function renderParent(){ const sid=document.getElementById('parentPick').value; 
 
 /* === Firebase Live Sync (Phase 2) === */
 function connectFirebase(){ const raw=document.getElementById('fbConfig').value.trim(); if(!raw){ toast('Paste config first'); return; }
-  try{ const cfg=JSON.parse(raw); if(!cfg.apiKey||!cfg.projectId) throw 0; localStorage.setItem(Sync.CFG_KEY, JSON.stringify(cfg)); toast('Config saved — restarting sync'); }catch(e){ toast('Invalid config JSON (need apiKey+projectId)'); return; }
+  try{ const cfg=JSON.parse(raw); if(!cfg.apiKey||!cfg.projectId) throw 0; localStorage.setItem(Sync.CFG_KEY, JSON.stringify(cfg)); localStorage.removeItem(Sync.DISABLED_KEY); toast('Config saved — restarting sync'); }catch(e){ toast('Invalid config JSON (need apiKey+projectId)'); return; }
   if(window.Sync && Sync.init()){ Sync.start(()=> (DB.students.length===0 && DB.classes.length===0), ()=>{ syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }); syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }
   else toast('Firebase SDK failed to load (offline?)'); }
-function disconnectFirebase(){ if(window.Sync) Sync.stop(); localStorage.removeItem(Sync.CFG_KEY); syncOn=false; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🔴 Local only'; toast('Disconnected — local only'); }
+function disconnectFirebase(){ if(window.Sync) Sync.stop(); localStorage.setItem(Sync.DISABLED_KEY,'1'); syncOn=false; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🔴 Local only (sync disabled)'; toast('Disconnected — local only'); }
 function testFirebase(){ if(!window.Sync||!Sync.enabled()){ toast('No config stored'); return; } toast('Config present: '+(Sync.config().projectId||'?')); }
 
 /* === Global Search (RBAC polish) === */
