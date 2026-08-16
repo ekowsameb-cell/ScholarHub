@@ -1,15 +1,29 @@
 /* ScholarHub live-sync layer (Phase 2, Firebase/Firestore).
-   GUARDED: does nothing unless a Firebase config is stored in
-   localStorage('scholarhub_fb_config'). App stays fully local/offline otherwise.
-   Uses the compat SDK loaded from CDN in index.html.
+   Uses the COMPAT SDK loaded from CDN in index.html (global `firebase`).
+   This config is a PUBLIC client key (normal for Firebase web apps); security
+   is enforced by Firestore Security Rules, NOT by hiding this. See firestore.rules.
    References the global `DB`, `defaultDB`, `save` from index.html (same page scope). */
 window.Sync = (function(){
-  const CFG_KEY='scholarhub_fb_config', SID_KEY='scholarhub_school_id';
-  let app=null, db=null, ref=null, onSnap=null, ready=false, applyingRemote=false, pushTimer=null;
+  const CFG_KEY='scholarhub_fb_config', SID_KEY='scholarhub_school_id', DISABLED_KEY='scholarhub_sync_disabled';
 
-  function config(){ try{ return JSON.parse(localStorage.getItem(CFG_KEY)); }catch(e){ return null; } }
+  // Default config embedded so every device auto-connects to THIS project.
+  // The Connect Firebase UI in Admin > Data Sync can override it per-device.
+  const DEFAULT_CONFIG = {
+    apiKey: "AIzaSyC6IbyLlmwXchp507oaRe0sEUZ9nKr1v8E",
+    authDomain: "scholar-hub-198c5.firebaseapp.com",
+    projectId: "scholar-hub-198c5",
+    storageBucket: "scholar-hub-198c5.firebasestorage.app",
+    messagingSenderId: "772649683244",
+    appId: "1:772649683244:web:58451728c3e359c5338489",
+    measurementId: "G-YGM32WJRFK"
+  };
+
+  let db=null, ref=null, onSnap=null, ready=false, applyingRemote=false, pushTimer=null;
+
+  function config(){ try{ const s=localStorage.getItem(CFG_KEY); if(s) return JSON.parse(s); }catch(e){} return DEFAULT_CONFIG; }
   function schoolId(){ return localStorage.getItem(SID_KEY) || 'default-school'; }
-  function enabled(){ return !!(window.firebase && config()); }
+  function isDisabled(){ return localStorage.getItem(DISABLED_KEY)==='1'; }
+  function enabled(){ return !isDisabled() && !!(window.firebase && config()); }
 
   function init(){
     if(!enabled()) return false;
@@ -21,10 +35,24 @@ window.Sync = (function(){
     }catch(e){ console.warn('Sync init failed', e); return false; }
   }
 
+  // Sign in anonymously so Firestore rules (request.auth != null) allow access.
+  // Requires Ecow to enable Anonymous Auth in Firebase console (one toggle).
+  async function ensureAuth(){
+    if(!window.firebase || !firebase.auth) return false;
+    try{
+      if(!firebase.auth().currentUser){
+        await firebase.auth().signInAnonymously();
+      }
+      return !!firebase.auth().currentUser;
+    }catch(e){ console.warn('Anon auth failed (enable Anonymous Auth in console):', e.message); return false; }
+  }
+
   // Pull once; if local is essentially empty, adopt cloud. Then subscribe.
   async function start(getLocalEmpty, onRemote){
     if(!enabled()) return false;
     if(!init()) return false;
+    const authed = await ensureAuth();
+    if(!authed){ console.warn('Sync: not authenticated — staying local. Enable Anonymous Auth in Firebase console.'); return false; }
     try{
       const snap = await ref.get();
       if(snap.exists){
@@ -66,5 +94,5 @@ window.Sync = (function(){
 
   function stop(){ if(onSnap) try{ onSnap(); }catch(e){} onSnap=null; ready=false; }
 
-  return { config, schoolId, enabled, init, start, push, stop, CFG_KEY, SID_KEY };
+  return { config, schoolId, enabled, isDisabled, init, start, push, stop, CFG_KEY, SID_KEY, DISABLED_KEY };
 })();
