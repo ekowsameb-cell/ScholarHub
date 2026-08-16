@@ -162,9 +162,20 @@
     <div class="view" id="av-arep"><div class="row"><button class="btn green" onclick="compileReports()">📄 Generate Term Reports (all students)</button><button class="btn ghost" onclick="downloadAllReports()">⬇ Download ZIP-less bundle</button></div><div id="reportOut"></div></div>
     <div class="view" id="av-astaff"><div class="row"><button class="btn" onclick="openStaff()">+ Add Staff</button></div><div id="staffList"></div></div>
     <div class="view" id="av-async">
+      <div class="ticket" style="border-left-color:var(--good)">
+        <h3 style="margin-top:0">Live Sync via Firebase (recommended)</h3>
+        <p class="small muted">Turns ScholarHub into a real shared database: every device (admin, cashier, teacher, principal) sees the same live data instantly. Paste your Firebase config once; it's stored on this device and used to connect. Requires internet to sync (works offline otherwise, queues changes).</p>
+        <div id="fbStatus" class="small"></div>
+        <textarea id="fbConfig" rows="5" placeholder='Paste Firebase config JSON, e.g. {"apiKey":"...","projectId":"...","appId":"..."}'></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="btn green" onclick="connectFirebase()">🔗 Connect</button>
+          <button class="btn ghost" onclick="disconnectFirebase()">Disconnect</button>
+          <button class="btn ghost" onclick="testFirebase()">Test</button>
+        </div>
+      </div>
       <div class="ticket" style="border-left-color:var(--warn)">
-        <h3 style="margin-top:0">Data Sync (offline, no cloud)</h3>
-        <p class="small muted">ScholarHub stores data on this device only. To share across devices: the <b>Admin</b> exports the master file, then other devices <b>Import</b> it. Re-import after any major change. (Live auto-sync = Phase 2 / Firebase.)</p>
+        <h3 style="margin-top:0">Manual Data Sync (offline, no cloud)</h3>
+        <p class="small muted">If you don't connect Firebase, use this: the <b>Admin</b> exports the master file, then other devices <b>Import</b> it. Re-import after any major change.</p>
         <div class="row">
           <button class="btn green" onclick="exportData()">⬇ Export Master (JSON)</button>
           <button class="btn" onclick="document.getElementById('importFile').click()">⬆ Import Master</button>
@@ -324,6 +335,10 @@
 
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/chart.umd.min.js"></script>
+<!-- Firebase compat SDK (only used if you Connect Firebase; app works without it) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="sync.js"></script>
 <script>
 /* ===== ScholarHub ERP (offline-first PWA, Path A). Evolved from SchoolLedger.
    Normalized local data layer mirrors the brief's relational schema (FK fields
@@ -332,6 +347,7 @@
 const STORE_KEY = 'scholarhub_v1';
 let DB = load();
 let currentRole = null, pendingPinCancel=null, activeStudentId=null, lastReceipt=null, lastReportId=null, clSubjTmp=[];
+let syncOn=false;
 
 function defaultDB(){ return {
   schoolProfile:{ schoolName:'Demo School', currentTerm:'2026/2027 - Term 1', gradingSystem:{A:80,B:70,C:60,D:50,F:0}, schoolHours:'7:00 - 15:00' },
@@ -340,7 +356,7 @@ function defaultDB(){ return {
   timetable:{}
 };}
 function load(){ try{ const r=localStorage.getItem(STORE_KEY); if(r) return Object.assign(defaultDB(), JSON.parse(r)); }catch(e){} return defaultDB(); }
-function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){} }
+function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){} if(window.Sync) Sync.push(); }
 
 /* theme + ui */
 function applyTheme(){ document.body.classList.toggle('theme-light', DB.settings.theme==='light'); }
@@ -545,6 +561,14 @@ function renderParent(){ const sid=document.getElementById('parentPick').value; 
     +'<div class="small muted">'+esc(s.classId||'')+' · Attendance '+(att.length?Math.round(100*pres/att.length):s.attendanceRate)+'%</div>'
     +'<h4 style="margin:10px 0 4px">Grades</h4>'+(rows||'<p class="muted">No grades yet.</p>')+'</div>'; }
 
+/* === Firebase Live Sync (Phase 2) === */
+function connectFirebase(){ const raw=document.getElementById('fbConfig').value.trim(); if(!raw){ toast('Paste config first'); return; }
+  try{ const cfg=JSON.parse(raw); if(!cfg.apiKey||!cfg.projectId) throw 0; localStorage.setItem(Sync.CFG_KEY, JSON.stringify(cfg)); toast('Config saved — restarting sync'); }catch(e){ toast('Invalid config JSON (need apiKey+projectId)'); return; }
+  if(window.Sync && Sync.init()){ Sync.start(()=> (DB.students.length===0 && DB.classes.length===0), ()=>{ syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }); syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }
+  else toast('Firebase SDK failed to load (offline?)'); }
+function disconnectFirebase(){ if(window.Sync) Sync.stop(); localStorage.removeItem(Sync.CFG_KEY); syncOn=false; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🔴 Local only'; toast('Disconnected — local only'); }
+function testFirebase(){ if(!window.Sync||!Sync.enabled()){ toast('No config stored'); return; } toast('Config present: '+(Sync.config().projectId||'?')); }
+
 /* === Global Search (RBAC polish) === */
 function globalSearch(){ const q=(document.getElementById('gsBox').value||'').toLowerCase().trim(); const out=document.getElementById('gsOut'); if(!q){ out.textContent=''; return; }
   const st=DB.students.filter(s=>(s.fullName||'').toLowerCase().includes(q)||(s.studentId||'').toLowerCase().includes(q)).length;
@@ -553,6 +577,14 @@ function globalSearch(){ const q=(document.getElementById('gsBox').value||'').to
   out.textContent='Students: '+st+' · Staff: '+DB.staff.filter(s=>(s.staffId||'').toLowerCase().includes(q)).length+' · Transactions: '+tx; }
 
 applyTheme();
+
+/* Boot live sync if previously connected */
+(async function bootSync(){
+  if(window.Sync && Sync.enabled()){
+    const ok = await Sync.start(()=> (DB.students.length===0 && DB.classes.length===0), ()=>{ syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; });
+    syncOn=ok; if(syncOn){ const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }
+  }
+})();
 </script>
 <div class="toast" id="toast"></div>
 </body>
