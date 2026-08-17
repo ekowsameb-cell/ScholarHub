@@ -83,7 +83,19 @@ window.Sync = (function(){
         setTimeout(()=>{ applyingRemote=false; }, 600);
       });
       return true;
-    }catch(e){ console.warn('Sync start failed', e); return false; }
+    }catch(e){
+      // Initial read/write was denied (e.g. Firestore rules not published yet).
+      // Surface a clear, actionable message instead of failing silently.
+      const denied = /permission|insufficient|denied/i.test(e.message);
+      console.warn('Sync start failed:', e.message);
+      if(denied){
+        console.warn('FIX: In Firebase console -> Firestore Database -> Rules, paste the scholarhub firestore.rules and Publish. Anon Auth is on, so allowing request.auth != null will enable sync.');
+        if(window.__onSyncBlocked) window.__onSyncBlocked('Firestore rules not published. Go to Firebase console → Firestore → Rules, paste the provided rules, and Publish. (Anon Auth is already on, so this one step enables sync.)');
+      } else {
+        if(window.__onSyncBlocked) window.__onSyncBlocked('Sync error: '+e.message);
+      }
+      return false;
+    }
   }
 
   function push(){
