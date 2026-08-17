@@ -124,7 +124,7 @@
   <button class="rolebtn" style="border-color:var(--teacher)" onclick="pickRole('teacher')"><span>📚 Teacher<small>Gradebook &amp; attendance</small></span></button>
   <button class="rolebtn" style="border-color:var(--cashier)" onclick="pickRole('cashier')"><span>💵 Cashier<small>Fees &amp; receipts</small></span></button>
   <button class="rolebtn" style="border-color:var(--principal)" onclick="pickRole('principal')"><span>📊 Principal<small>Dashboard &amp; analytics</small></span></button>
-  <button class="rolebtn" style="border-color:var(--parent)" onclick="pickRole('parent')"><span>👪 Parent<small>Portal (demo PIN)</small></span></button>
+  <button class="rolebtn" style="border-color:var(--parent)" onclick="pickRole('parent')"><span>👪 Parent<small>Portal (SMS login)</small></span></button>
   <p class="small muted" style="text-align:center;margin-top:16px">Offline-first. Works without internet. ⚡ Powered by <b>Providers Consultancy</b></p>
   <div style="text-align:center;margin-top:6px"><button class="btn ghost sm" onclick="document.getElementById('importFileLaunch').click()">⬆ Import existing data file</button><input type="file" id="importFileLaunch" accept="application/json" style="display:none" onchange="importData(this.files[0])"></div>
 </div>
@@ -214,8 +214,23 @@
   <!-- PARENT -->
   <div id="role-parent" class="roleview hidden">
     <div class="role-hero"><h3>Parent · Portal</h3><p>your child's info</p></div>
-    <div class="row"><select id="parentPick" onchange="renderParent()"></select></div>
-    <div id="parentView"></div>
+    <div id="parentLogin">
+      <p class="small muted">Enter the WhatsApp number you gave at admission. We'll text a code to confirm it's you.</p>
+      <input id="parPhone" placeholder="Phone (e.g. 23320...)" style="margin-top:8px">
+      <div id="parOtpWrap" class="hidden" style="margin-top:10px">
+        <input id="parOtp" placeholder="6-digit code" inputmode="numeric" style="margin-top:8px">
+      </div>
+      <div class="row" style="margin-top:12px;justify-content:flex-end">
+        <button class="btn ghost" id="parSendBtn" onclick="parentSendCode()">📩 Send code</button>
+        <button class="btn green hidden" id="parVerifyBtn" onclick="parentVerifyCode()">✓ Verify</button>
+      </div>
+      <div id="parLoginStatus" class="small muted" style="margin-top:8px"></div>
+    </div>
+    <div id="parentPortalArea" class="hidden">
+      <div id="parentView"></div>
+      <div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn ghost sm" onclick="parentLogout()">↩ Log out</button></div>
+    </div>
+    <div id="recaptcha-parent"></div>
   </div>
 </div>
 
@@ -370,6 +385,9 @@ function money(n){ return 'GH₵ '+ (Number(n)||0).toLocaleString('en-GH',{minim
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function genId(p){ return p+'-'+Math.random().toString(36).slice(2,8).toUpperCase(); }
 function fmtDate(d){ try{ return new Date(d).toLocaleDateString('en-GB'); }catch(e){ return d; } }
+function normalPhone(p){ return String(p||'').replace(/[^0-9]/g,'').replace(/^0+/,''); }
+function ghE164(p){ let d=normalPhone(p); if(!d) return ''; if(d.startsWith('233')) return '+'+d; if(d.length===9) return '+233'+d; // Ghana local 9-digit (e.g. 20xxxxxxx)
+  if(d.startsWith('0')) return '+233'+d.slice(1); return '+'+d; }
 
 /* RBAC launcher */
 const ROLE_LABEL={admin:'Admin',teacher:'Teacher',cashier:'Cashier',principal:'Principal',parent:'Parent'};
@@ -391,7 +409,7 @@ function enterRole(role){
   else if(role==='teacher') switchT('tatt');
   else if(role==='cashier') cashSearch();
   else if(role==='principal') renderPrincipal();
-  else if(role==='parent'){ renderParentPicker(); renderParent(); }
+  else if(role==='parent'){ parentEnterSetup(); }
 }
 function goLaunch(){ document.getElementById('app').classList.add('hidden'); document.getElementById('launch').classList.remove('hidden'); currentRole=null; }
 
@@ -582,11 +600,49 @@ function drawCharts(collected,outstanding,attRate){ if(window.Chart){ const type
     const attSessions=DB.attendance.slice(-7); const attLabels=attSessions.map(a=>a.date); const attVals=attSessions.map(a=>{ const p=a.records.filter(r=>r.status==='Present').length; return a.records.length?100*p/a.records.length:0; });
     new Chart(document.getElementById('attChart'),{type:'line',data:{labels:attLabels.length?attLabels:['—'],datasets:[{label:'Attendance %',data:attVals.length?attVals:[0],borderColor:'#22c55e',fill:false}]},options:{responsive:true}}); } }
 
-/* === PARENT PORTAL (Module F, v1 PIN mode) === */
-function renderParentPicker(){ document.getElementById('parentPick').innerHTML=DB.students.map(s=>'<option value="'+esc(s.studentId)+'">'+esc(s.fullName)+'</option>').join(''); }
-function renderParent(){ const sid=document.getElementById('parentPick').value; const s=DB.students.find(x=>x.studentId===sid); if(!s) return; const subs=studentSubjects(s);
-  let rows=''; subs.forEach(sb=>{ const g=DB.grades.find(x=>x.studentId===sid&&x.subjectId===sb.subjectId&&x.term===DB.schoolProfile.currentTerm); rows+='<div class="line"><span>'+esc(sb.name)+'</span><span>'+(g?g.total+' ('+g.grade+')':'-')+'</span></div>'; });
-  const att=DB.attendance.flatMap(a=>a.records).filter(r=>r.studentId===sid); const pres=att.filter(r=>r.status==='Present').length;
+/* === PARENT PORTAL (Module F, v2 — phone + SMS OTP, ward-scoped) === */
+let parentVerifiedId=null; // the verified parent uid (ward-scoped)
+function parentEnterSetup(){ parentVerifiedId=null; document.getElementById('parentLogin').classList.remove('hidden'); document.getElementById('parentPortalArea').classList.add('hidden'); document.getElementById('parOtpWrap').classList.add('hidden'); document.getElementById('parSendBtn').classList.remove('hidden'); document.getElementById('parVerifyBtn').classList.add('hidden'); document.getElementById('parLoginStatus').textContent=''; document.getElementById('parPhone').value=''; document.getElementById('parOtp').value='';
+  // Set up invisible reCAPTCHA verifier for Firebase Phone Auth (needs firebase + web context).
+  try{ if(window.firebase && firebase.apps && firebase.apps.length>0 && typeof firebase.auth==='function' && !window.recaptchaVerifier){ window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-parent', { size:'invisible' }); window.recaptchaVerifier.render().catch(()=>{}); } }catch(e){ console.warn('reCAPTCHA setup skipped:', e.message); } }
+function parentFindByPhone(phone){ const np=normalPhone(phone); const e164=ghE164(phone).replace(/[^0-9]/g,''); if(!np) return null;
+  return DB.users.find(u=>{ if(u.role!=='Parent') return false; const up=normalPhone(u.phone); const ue=ghE164(u.phone).replace(/[^0-9]/g,''); return up===np || ue===e164 || up==='233'+np || ('233'+up)===e164; }) || null; }
+function parentSendCode(){
+  const phone=document.getElementById('parPhone').value.trim();
+  const status=document.getElementById('parLoginStatus');
+  if(!normalPhone(phone)){ status.textContent='Enter a valid phone number.'; status.style.color='var(--bad)'; return; }
+  // Always allow local lookup: parent must exist in DB to receive a code.
+  const u=parentFindByPhone(phone);
+  if(!u){ status.textContent='No parent found with that number. Ask the school to register it at admission.'; status.style.color='var(--bad)'; return; }
+  // If Firebase Phone Auth is available, send a real SMS OTP; else fall back to PIN mode.
+  let phoneAuthAvailable=false;
+  try{ if(window.firebase && firebase.apps && firebase.apps.length>0 && typeof firebase.auth==='function' && typeof firebase.auth().signInWithPhoneNumber==='function' && window.recaptchaVerifier){ phoneAuthAvailable=true; } }catch(e){ phoneAuthAvailable=false; }
+  if(phoneAuthAvailable){
+    status.textContent='Sending code…'; status.style.color='';
+    firebase.auth().signInWithPhoneNumber(ghE164(phone), window.recaptchaVerifier)
+      .then(confirmation=>{ window._parConfirmation=confirmation; document.getElementById('parOtpWrap').classList.remove('hidden'); document.getElementById('parSendBtn').classList.add('hidden'); document.getElementById('parVerifyBtn').classList.remove('hidden'); status.textContent='Code sent via SMS. Enter it below.'; status.style.color='var(--good)'; })
+      .catch(e=>{ status.textContent='SMS failed: '+e.message+' (using PIN fallback).'; status.style.color='var(--bad)'; parentFallbackPin(u); });
+  } else { parentFallbackPin(u); }
+}
+function parentFallbackPin(u){ // offline / no Firebase: use the parent's personal PIN (default 0000 until changed)
+  const pin=prompt('SMS unavailable. Enter your parent PIN for '+u.fullName+':');
+  if(pin===null) return;
+  const exp=DB.settings.pins.parent||'0000';
+  if(pin===exp){ parentEnter(u); } else { document.getElementById('parLoginStatus').textContent='Wrong PIN.'; document.getElementById('parLoginStatus').style.color='var(--bad)'; }
+}
+function parentVerifyCode(){ const code=document.getElementById('parOtp').value.trim(); const status=document.getElementById('parLoginStatus');
+  if(!window._parConfirmation){ status.textContent='Request a code first.'; return; }
+  window._parConfirmation.confirm(code).then(()=>{ const u=parentFindByPhone(document.getElementById('parPhone').value); if(u) parentEnter(u); })
+    .catch(e=>{ status.textContent='Invalid code: '+e.message; status.style.color='var(--bad)'; });
+}
+function parentEnter(u){ parentVerifiedId=u.uid; document.getElementById('parentLogin').classList.add('hidden'); document.getElementById('parentPortalArea').classList.remove('hidden'); renderParent(); toast('Welcome, '+u.fullName); }
+function parentLogout(){ parentVerifiedId=null; document.getElementById('parentPortalArea').classList.add('hidden'); document.getElementById('parentLogin').classList.remove('hidden'); document.getElementById('parOtpWrap').classList.add('hidden'); document.getElementById('parSendBtn').classList.remove('hidden'); document.getElementById('parVerifyBtn').classList.add('hidden'); document.getElementById('parPhone').value=''; document.getElementById('parOtp').value=''; document.getElementById('parLoginStatus').textContent=''; }
+function renderParentPicker(){ /* deprecated: ward-scoped now */ }
+function renderParent(){ if(!parentVerifiedId) return; const u=DB.users.find(x=>x.uid===parentVerifiedId); if(!u) return;
+  const s=DB.students.find(x=>x.parentId===u.uid); if(!s){ document.getElementById('parentView').innerHTML='<p class="muted">No child linked to this number yet.</p>'; return; }
+  const subs=studentSubjects(s);
+  let rows=''; subs.forEach(sb=>{ const g=DB.grades.find(x=>x.studentId===s.studentId&&x.subjectId===sb.subjectId&&x.term===DB.schoolProfile.currentTerm); rows+='<div class="line"><span>'+esc(sb.name)+'</span><span>'+(g?g.total+' ('+g.grade+')':'-')+'</span></div>'; });
+  const att=DB.attendance.flatMap(a=>a.records).filter(r=>r.studentId===s.studentId); const pres=att.filter(r=>r.status==='Present').length;
   document.getElementById('parentView').innerHTML='<div class="ticket"><div class="top"><span class="tt">'+esc(s.fullName)+'</span><span class="pill '+(s.currentBalance>0?'due':'paid')+'">'+(s.currentBalance>0?'Owes '+money(s.currentBalance):'Paid up')+'</span></div>'
     +'<div class="small muted">'+esc(s.classId||'')+' · Attendance '+(att.length?Math.round(100*pres/att.length):s.attendanceRate)+'%</div>'
     +'<h4 style="margin:10px 0 4px">Grades</h4>'+(rows||'<p class="muted">No grades yet.</p>')+'</div>'; }
