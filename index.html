@@ -232,7 +232,7 @@
 <!-- ADMIT MODAL -->
 <div class="modal" id="admitModal">
   <div class="sheet">
-    <h3>New Admission</h3>
+    <h3 id="admitTitle">New Admission</h3>
     <input id="adName" placeholder="Full name">
     <input id="adDob" placeholder="DOB (e.g. 2014-05-02)" style="margin-top:8px">
     <input id="adPrev" placeholder="Previous school" style="margin-top:8px">
@@ -285,7 +285,7 @@
 <!-- STAFF MODAL -->
 <div class="modal" id="staffModal">
   <div class="sheet">
-    <h3>Add Staff</h3>
+    <h3 id="staffTitle">Add Staff</h3>
     <input id="stId" placeholder="Staff ID (e.g. STF-001)">
     <input id="stName" placeholder="Full name" style="margin-top:8px">
     <select id="stRole" style="margin-top:8px"><option>Teacher</option><option>Admin</option><option>Support</option></select>
@@ -348,7 +348,7 @@
    ID-card PDF) are Phase 2; v1 uses local PIN auth + wa.me + jsPDF. ===== */
 const STORE_KEY = 'scholarhub_v1';
 let DB = load();
-let currentRole = null, pendingPinCancel=null, activeStudentId=null, lastReceipt=null, lastReportId=null, clSubjTmp=[];
+let currentRole = null, pendingPinCancel=null, activeStudentId=null, lastReceipt=null, lastReportId=null, clSubjTmp=[], editingStudentId=null, editingStaffId=null;
 let syncOn=false;
 
 function defaultDB(){ return {
@@ -419,8 +419,26 @@ function saveAdmission(){
   ['adName','adDob','adPrev','adPName','adPPhone'].forEach(id=>document.getElementById(id).value='');
   closeModal('admitModal'); renderAdmissions(); toast('Admitted & parent login created (PIN mode v1)');
 }
+function editStudent(sid){ const s=DB.students.find(x=>x.studentId===sid); if(!s) return; editingStudentId=sid;
+  document.getElementById('adName').value=s.fullName; document.getElementById('adDob').value=s.dob||''; document.getElementById('adPrev').value=s.prevSchool||'';
+  const p=DB.users.find(u=>u.uid===s.parentId)||{}; document.getElementById('adPName').value=p.fullName||''; document.getElementById('adPPhone').value=p.phone||'';
+  const sel=document.getElementById('adClass'); sel.innerHTML='<option value="">— Unassigned —</option>'+DB.classes.map(c=>'<option value="'+esc(c.classId)+'"'+(c.classId===s.classId?' selected':'')+'>'+esc(c.classId)+'</option>').join('');
+  document.getElementById('admitTitle').textContent='Edit Student';
+  document.querySelector('#admitModal .btn.green').setAttribute('onclick','updateStudent()');
+  document.querySelector('#admitModal .btn.green').textContent='Save Changes';
+  openModal('admitModal'); }
+function updateStudent(){ const sid=editingStudentId; if(!sid) return; const s=DB.students.find(x=>x.studentId===sid); if(!s){ toast('Student not found'); return; }
+  const name=document.getElementById('adName').value.trim(); if(!name){ toast('Name required'); return; }
+  s.fullName=name; s.dob=document.getElementById('adDob').value.trim(); s.prevSchool=document.getElementById('adPrev').value.trim(); s.classId=document.getElementById('adClass').value;
+  const p=DB.users.find(u=>u.uid===s.parentId); if(p){ p.fullName=document.getElementById('adPName').value.trim()||'Parent'; p.phone=document.getElementById('adPPhone').value.trim(); }
+  save(); closeModal('admitModal'); renderAdmissions();
+  document.getElementById('admitTitle').textContent='New Admission';
+  const g=document.querySelector('#admitModal .btn.green'); g.setAttribute('onclick','saveAdmission()'); g.textContent='Enroll';
+  editingStudentId=null; toast('Student updated'); }
+function deleteStudent(sid){ const s=DB.students.find(x=>x.studentId===sid); if(!s) return; if(!confirm('Delete '+s.fullName+'? This cannot be undone.')) return;
+  DB.students=DB.students.filter(x=>x.studentId!==sid); DB.users=DB.users.filter(u=>u.uid!==s.parentId); save(); renderAdmissions(); toast('Student deleted'); }
 function renderAdmissions(){ const el=document.getElementById('admitList'); if(!DB.students.length){ el.innerHTML='<p class="muted">No admissions yet.</p>'; return; }
-  el.innerHTML=DB.students.map(s=>'<div class="ticket"><div class="top"><span class="tt">'+esc(s.fullName)+'</span><span class="pill '+(s.classId?'active':'due')+'">'+(s.classId||'Unassigned')+'</span></div><div class="small muted">'+esc(s.studentId)+' · parent: '+esc(s.parentId)+'</div></div>').join(''); }
+  el.innerHTML=DB.students.map(s=>'<div class="ticket"><div class="top"><span class="tt">'+esc(s.fullName)+'</span><span class="pill '+(s.classId?'active':'due')+'">'+(s.classId||'Unassigned')+'</span></div><div class="small muted">'+esc(s.studentId)+' · parent: '+esc(s.parentId)+'</div><div class="row" style="margin-top:6px;justify-content:flex-end"><button class="btn sm" onclick="editStudent(\''+esc(s.studentId)+'\')">✏ Edit</button><button class="btn sm ghost" onclick="deleteStudent(\''+esc(s.studentId)+'\')">🗑 Delete</button></div></div>').join(''); }
 
 /* Classes (Module B) */
 function openClass(){ clSubjTmp=[]; document.getElementById('clSubjList').innerHTML=''; openModal('classModal'); }
@@ -468,12 +486,22 @@ function downloadReportPDF(){ if(!lastReportId) return; const { jsPDF }=window.j
 function downloadAllReports(){ toast('Open each report and tap PDF (bundle = next Phase)'); }
 
 /* Staff / HR (Module scope) */
-function openStaff(){ openModal('staffModal'); }
+function openStaff(){ resetStaffModal(); openModal('staffModal'); }
 function saveStaff(){ const id=document.getElementById('stId').value.trim(); if(!id){ toast('Staff ID required'); return; }
-  DB.staff.push({ staffId:id, userId:genId('user'), salary:+document.getElementById('stSalary').value||0, role:document.getElementById('stRole').value, bankDetails:document.getElementById('stBank').value.trim(), leaveDays:12 });
-  save(); closeModal('staffModal'); renderStaff(); toast('Staff added'); }
+  const rec=DB.staff.find(x=>x.staffId===id);
+  if(rec){ rec.fullName=document.getElementById('stName').value.trim(); rec.role=document.getElementById('stRole').value; rec.salary=+document.getElementById('stSalary').value||0; rec.bankDetails=document.getElementById('stBank').value.trim(); save(); closeModal('staffModal'); renderStaff(); editingStaffId=null; resetStaffModal(); toast('Staff updated'); return; }
+  DB.staff.push({ staffId:id, userId:genId('user'), fullName:document.getElementById('stName').value.trim(), salary:+document.getElementById('stSalary').value||0, role:document.getElementById('stRole').value, bankDetails:document.getElementById('stBank').value.trim(), leaveDays:12 });
+  save(); closeModal('staffModal'); renderStaff(); resetStaffModal(); toast('Staff added'); }
+function resetStaffModal(){ ['stId','stName','stSalary','stBank'].forEach(id=>document.getElementById(id).value=''); document.getElementById('stId').readOnly=false; document.getElementById('stRole').value='Teacher'; document.getElementById('staffTitle').textContent='Add Staff'; const g=document.querySelector('#staffModal .btn.green'); g.setAttribute('onclick','saveStaff()'); g.textContent='Save Staff'; }
+function editStaff(sid){ const s=DB.staff.find(x=>x.staffId===sid); if(!s) return; editingStaffId=sid;
+  document.getElementById('stId').value=s.staffId; document.getElementById('stId').readOnly=true; document.getElementById('stName').value=s.fullName||''; document.getElementById('stRole').value=s.role||'Teacher'; document.getElementById('stSalary').value=s.salary||0; document.getElementById('stBank').value=s.bankDetails||'';
+  document.getElementById('staffTitle').textContent='Edit Staff';
+  document.querySelector('#staffModal .btn.green').setAttribute('onclick','saveStaff()');
+  document.querySelector('#staffModal .btn.green').textContent='Save Changes';
+  openModal('staffModal'); }
+function deleteStaff(sid){ const s=DB.staff.find(x=>x.staffId===sid); if(!s) return; if(!confirm('Delete staff '+sid+'?')) return; DB.staff=DB.staff.filter(x=>x.staffId!==sid); save(); renderStaff(); toast('Staff deleted'); }
 function renderStaff(){ const el=document.getElementById('staffList'); if(!DB.staff.length){ el.innerHTML='<p class="muted">No staff yet.</p>'; return; }
-  el.innerHTML=DB.staff.map(s=>'<div class="ticket"><div class="top"><span class="tt">'+esc(s.staffId)+'</span><span class="muted">'+esc(s.role)+'</span></div><div class="small muted">Salary '+money(s.salary)+' · Leave '+s.leaveDays+'d</div></div>').join(''); }
+  el.innerHTML=DB.staff.map(s=>'<div class="ticket"><div class="top"><span class="tt">'+esc(s.staffId)+' · '+esc(s.fullName||'')+'</span><span class="muted">'+esc(s.role)+'</span></div><div class="small muted">Salary '+money(s.salary)+' · Leave '+s.leaveDays+'d</div><div class="row" style="margin-top:6px;justify-content:flex-end"><button class="btn sm" onclick="editStaff(\''+esc(s.staffId)+'\')">✏ Edit</button><button class="btn sm ghost" onclick="deleteStaff(\''+esc(s.staffId)+'\')">🗑 Delete</button></div></div>').join(''); }
 
 /* Export / Import master (multi-device stopgap) */
 function exportData(){ const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ScholarHub-data-'+new Date().toISOString().slice(0,10)+'.json'; a.click(); toast('Exported master file'); }
@@ -564,6 +592,14 @@ function renderParent(){ const sid=document.getElementById('parentPick').value; 
     +'<h4 style="margin:10px 0 4px">Grades</h4>'+(rows||'<p class="muted">No grades yet.</p>')+'</div>'; }
 
 /* === Firebase Live Sync (Phase 2) === */
+function setSyncStatus(txt, ok){ const s=document.getElementById('fbStatus'); if(s){ s.innerHTML=txt; s.style.color = ok===false ? 'var(--bad)' : (ok===true ? 'var(--good)' : ''); } }
+window.__onSyncBlocked = function(msg){ setSyncStatus('⚠️ '+msg, false); };
+function syncDiagnostics(){ const out=[];
+  out.push('SDK loaded: '+(window.firebase?'yes':'NO — offline or CDN blocked'));
+  out.push('Config: '+(window.Sync&&Sync.enabled()?(Sync.config().projectId||'?'):'none / disabled'));
+  out.push('Anonymous Auth: '+(window.firebase&&firebase.auth&&firebase.auth().currentUser?'signed in':'not signed in'));
+  out.push('Status: '+(syncOn?'🟢 live':'🔴 local only'));
+  return out.join('<br>'); }
 /* Tolerant config parser: accepts BOTH pure JSON and the Firebase console
    JS snippet (with // comments, `const firebaseConfig =`, unquoted keys). */
 function parseConfig(raw){
@@ -583,27 +619,33 @@ function parseConfig(raw){
 function connectFirebase(){ const raw=document.getElementById('fbConfig').value.trim(); if(!raw){ toast('Paste config first'); return; }
   const cfg=parseConfig(raw); if(!cfg){ toast('Invalid config — paste the full Firebase config object'); return; }
   localStorage.setItem(Sync.CFG_KEY, JSON.stringify(cfg)); localStorage.removeItem(Sync.DISABLED_KEY); toast('Config saved — connecting…');
-  if(window.Sync && Sync.init()){ Sync.start(()=> (DB.students.length===0 && DB.classes.length===0), ()=>{ syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }); syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }
-  else toast('Firebase SDK failed to load (offline?)'); }
+  if(!window.firebase){ setSyncStatus('❌ Firebase SDK failed to load (offline / CDN blocked). App still works locally.', false); return; }
+  if(window.Sync && Sync.init()){ Sync.start(()=> (DB.students.length===0 && DB.classes.length===0), ()=>{ syncOn=true; setSyncStatus('🟢 Synced (live)', true); }).then(ok=>{ if(!ok){ setSyncStatus('⚠️ Not synced — check internet & Anonymous Auth in Firebase console.<br>'+syncDiagnostics(), false); } }).catch(e=>{ setSyncStatus('❌ Sync error: '+e.message+'<br>'+syncDiagnostics(), false); }); syncOn=true; setSyncStatus('🟢 Synced (live)', true); }
+  else setSyncStatus('❌ Firebase init failed (bad config or offline).', false); }
 function disconnectFirebase(){ if(window.Sync) Sync.stop(); localStorage.setItem(Sync.DISABLED_KEY,'1'); syncOn=false; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🔴 Local only (sync disabled)'; toast('Disconnected — local only'); }
-function useEmbeddedConfig(){ localStorage.removeItem(Sync.CFG_KEY); localStorage.removeItem(Sync.DISABLED_KEY); toast('Cleared override — using built-in config'); if(window.Sync && Sync.init()){ Sync.start(()=> (DB.students.length===0 && DB.classes.length===0), ()=>{ syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }); syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; } else toast('Firebase SDK failed to load (offline?)'); }
-function testFirebase(){ if(!window.Sync||!Sync.enabled()){ toast('No config stored'); return; } toast('Config present: '+(Sync.config().projectId||'?')); }
+function useEmbeddedConfig(){ localStorage.removeItem(Sync.CFG_KEY); localStorage.removeItem(Sync.DISABLED_KEY); toast('Cleared override — using built-in config'); if(!window.firebase){ setSyncStatus('❌ Firebase SDK failed to load (offline / CDN blocked). App still works locally.', false); return; } if(window.Sync && Sync.init()){ Sync.start(()=> (DB.students.length===0 && DB.classes.length===0), ()=>{ syncOn=true; setSyncStatus('🟢 Synced (live)', true); }).then(ok=>{ if(!ok){ setSyncStatus('⚠️ Not synced — check internet & Anonymous Auth in Firebase console.<br>'+syncDiagnostics(), false); } }).catch(e=>{ setSyncStatus('❌ Sync error: '+e.message+'<br>'+syncDiagnostics(), false); }); syncOn=true; setSyncStatus('🟢 Synced (live)', true); } else setSyncStatus('❌ Firebase init failed.', false); }
+function testFirebase(){ if(!window.Sync||!Sync.enabled()){ toast('No config stored'); return; } setSyncStatus('🔧 Diagnostics:<br>'+syncDiagnostics(), null); toast('Diagnostics shown below'); }
 
 /* === Global Search (RBAC polish) === */
-function globalSearch(){ const q=(document.getElementById('gsBox').value||'').toLowerCase().trim(); const out=document.getElementById('gsOut'); if(!q){ out.textContent=''; return; }
-  const st=DB.students.filter(s=>(s.fullName||'').toLowerCase().includes(q)||(s.studentId||'').toLowerCase().includes(q)).length;
-  const sf=DB.staff.filter(s=>(s.staffId||'').toLowerCase().includes(q)||(s.staffId&&false)).length;
-  const tx=DB.feeTransactions.filter(t=>t.transactionId.toLowerCase().includes(q)||String(t.amount).includes(q)).length;
-  out.textContent='Students: '+st+' · Staff: '+DB.staff.filter(s=>(s.staffId||'').toLowerCase().includes(q)).length+' · Transactions: '+tx; }
+function globalSearch(){ const q=(document.getElementById('gsBox').value||'').toLowerCase().trim(); const out=document.getElementById('gsOut'); if(!q){ out.innerHTML=''; return; }
+  const st=DB.students.filter(s=>(s.fullName||'').toLowerCase().includes(q)||(s.studentId||'').toLowerCase().includes(q));
+  const sf=DB.staff.filter(s=>(s.staffId||'').toLowerCase().includes(q)||(s.fullName||'').toLowerCase().includes(q));
+  const tx=DB.feeTransactions.filter(t=>(t.transactionId||'').toLowerCase().includes(q)||String(t.amount).includes(q));
+  let html='';
+  if(st.length) html+='<div class="small muted" style="margin-top:6px">Students ('+st.length+')</div>'+st.slice(0,20).map(s=>'<div class="ticket" style="cursor:pointer" onclick="editStudent(\''+esc(s.studentId)+'\')"><div class="top"><span class="tt">'+esc(s.fullName)+'</span><span class="pill '+(s.classId?'active':'due')+'">'+(s.classId||'Unassigned')+'</span></div><div class="small muted">'+esc(s.studentId)+'</div></div>').join('');
+  if(sf.length) html+='<div class="small muted" style="margin-top:6px">Staff ('+sf.length+')</div>'+sf.slice(0,20).map(s=>'<div class="ticket" style="cursor:pointer" onclick="editStaff(\''+esc(s.staffId)+'\')"><div class="top"><span class="tt">'+esc(s.fullName||s.staffId)+'</span><span class="muted">'+esc(s.role)+'</span></div><div class="small muted">'+esc(s.staffId)+'</div></div>').join('');
+  if(tx.length) html+='<div class="small muted" style="margin-top:6px">Transactions ('+tx.length+')</div>'+tx.slice(0,10).map(t=>'<div class="ticket"><div class="top"><span class="tt">'+esc(t.transactionId)+'</span><span class="'+(t.amount>0?'owes':'owes clear')+'" style="color:var(--good)">'+money(t.amount)+'</span></div><div class="small muted">'+esc(t.type)+' · '+esc(fmtDate(t.timestamp))+'</div></div>').join('');
+  if(!html) html='<p class="muted small">No matches.</p>';
+  out.innerHTML=html; }
 
 applyTheme();
 
 /* Boot live sync if previously connected */
 (async function bootSync(){
   if(window.Sync && Sync.enabled()){
-    const ok = await Sync.start(()=> (DB.students.length===0 && DB.classes.length===0), ()=>{ syncOn=true; const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; });
-    syncOn=ok; if(syncOn){ const s=document.getElementById('fbStatus'); if(s) s.innerHTML='🟢 Synced (live)'; }
-  }
+    if(!window.firebase){ setSyncStatus('❌ Firebase SDK failed to load (offline / CDN blocked). Using local data only.', false); }
+    else { const ok = await Sync.start(()=> (DB.students.length===0 && DB.classes.length===0), ()=>{ syncOn=true; setSyncStatus('🟢 Synced (live)', true); }); syncOn=ok; if(syncOn){ setSyncStatus('🟢 Synced (live)', true); } else { setSyncStatus('⚠️ Auto-sync failed — check internet & Anonymous Auth.<br>'+syncDiagnostics(), false); } }
+  } else { const s=document.getElementById('fbStatus'); if(s && s.innerHTML==='') s.innerHTML='<span class="muted">Not connected. Use “Use Built-in” or “Connect” to enable live sync.</span>'; }
 })();
 </script>
 <div class="toast" id="toast"></div>
