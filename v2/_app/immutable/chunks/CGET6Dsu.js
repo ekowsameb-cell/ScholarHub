@@ -1,0 +1,1 @@
+import{o as a,a as s,g as r,d as u,b as e,s as o,c}from"./ChfzthBB.js";async function g(t,n){return(await o(s,t,n)).user}function l(){return c(s)}async function f(){const t=s.currentUser;if(!t)return null;const n=await r(u(e,"users",t.uid));return n.exists()?n.data():null}function h(t){return a(s,t)}export{l as a,f as g,g as l,h as w};
