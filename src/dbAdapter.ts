@@ -1,12 +1,19 @@
-import type {
-  User, Student, Class, Subject, Grade, AttendanceRecord,
-  FeeTransaction, ApprovalRequest, LessonPlan, Task, TimetableSlot
-} from './data/mockData';
+// src/dbAdapter.ts
+import { db, auth } from './firebase';
+import { collection, setDoc, doc, onSnapshot } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+
+
 import {
   mockUsers, mockStudents, mockClasses, mockSubjects, mockGrades,
   mockAttendance, mockFeeTransactions, mockLessonPlans, mockTasks,
-  mockApprovals, mockTimetableSlots, calculateWAECGrade
+  mockApprovals, mockTimetableSlots, calculateWAECGrade,
+  // Type imports
+  type User, type Student, type Class, type Subject, type Grade,
+  type AttendanceRecord, type FeeTransaction, type LessonPlan,
+  type Task, type ApprovalRequest, type TimetableSlot,
 } from './data/mockData';
+
 
 // Safe localStorage initialization wrapper
 const getOrInit = <T>(key: string, initialData: T[]): T[] => {
@@ -51,14 +58,101 @@ export const dbInit = () => {
 // Initialize DB immediately
 dbInit();
 
+// -----------------------------------------------------------------------
+// Firestore collection name map  (localStorage key → Firestore collection)
+// -----------------------------------------------------------------------
+const COLLECTION_MAP: Record<string, string> = {
+  sh_users:          'users',
+  sh_students:       'students',
+  sh_classes:        'classes',
+  sh_subjects:       'subjects',
+  sh_grades:         'grades',
+  sh_attendance:     'attendance',
+  sh_feeTransactions:'feeTransactions',
+  sh_lessonPlans:    'lessonPlans',
+  sh_approvals:      'approvals',
+  sh_tasks:          'tasks',
+  sh_timetable:      'timetable',
+  sh_assignments:    'assignments',
+};
+
+/** Returns the best document ID for an item (checks common id fields). */
+const getDocId = (item: Record<string, unknown>): string | null => {
+  const idFields = [
+    'uid', 'studentId', 'classId', 'subjectId', 'gradeId',
+    'assignmentId', 'transactionId', 'planId', 'taskId', 'approvalId',
+    'slotId', 'timetableId', 'attendanceId', 'id',
+  ];
+  for (const f of idFields) {
+    if (item[f] && typeof item[f] === 'string') return item[f] as string;
+  }
+  // AttendanceRecord uses date + classId as composite key
+  if (item['date'] && item['classId']) {
+    return `${item['date']}_${item['classId']}`;
+  }
+  return null;
+};
+
+
+/**
+ * Push a full list to the matching Firestore collection.
+ * Fire-and-forget — never throws so it never blocks the UI.
+ */
+const syncCollection = async (key: string, list: unknown[]): Promise<void> => {
+  const collName = COLLECTION_MAP[key];
+  if (!collName) return; // unknown key — skip
+  try {
+    await Promise.all(
+      (list as Record<string, unknown>[]).map(item => {
+        const id = getDocId(item);
+        if (!id) return Promise.resolve();
+        return setDoc(doc(db, collName, id), item);
+      })
+    );
+  } catch (err) {
+    console.error('Firestore push error for', key, err);
+  }
+};
+
 // Local Storage Getters & Setters
 const getList = <T>(key: string): T[] => {
   return JSON.parse(localStorage.getItem(key) || '[]');
 };
 
+/**
+ * Saves list to localStorage then asynchronously pushes to Firestore.
+ * The Firestore push is fire-and-forget so it never blocks the UI.
+ */
 const saveList = <T>(key: string, list: T[]) => {
   localStorage.setItem(key, JSON.stringify(list));
+  // Non-blocking push to Firestore
+  syncCollection(key, list as unknown[]).catch(() => { /* already logged */ });
 };
+
+// -----------------------------------------------------------------------
+// Real-time pull sync: Firestore → localStorage
+// Attaches onSnapshot listeners once the user is authenticated.
+// -----------------------------------------------------------------------
+const dbSync = () => {
+  onAuthStateChanged(auth, (user: unknown) => {
+
+    if (!user) return;
+    Object.entries(COLLECTION_MAP).forEach(([localKey, collName]) => {
+      onSnapshot(collection(db, collName), snapshot => {
+        if (snapshot.empty) return;
+        const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Only overwrite if Firestore has more or equal data to avoid wiping local-only data
+        const local = getList(localKey);
+        if (data.length >= local.length) {
+          localStorage.setItem(localKey, JSON.stringify(data));
+        }
+      }, err => console.error('onSnapshot error for', collName, err));
+    });
+  });
+};
+dbSync();
+
+
 
 // USER CRUD
 export const dbGetUsers = (): User[] => getList<User>('sh_users');
@@ -85,6 +179,10 @@ export const dbUpdateUserProfilePic = async (uid: string, dataUrl: string): Prom
   if (index !== -1) {
     users[index] = { ...users[index], avatar: dataUrl };
     saveList('sh_users', users);
+    // Sync each user to Firestore
+    users.forEach(u => {
+      setDoc(doc(db, 'users', u.uid), u);
+    });
   }
 
   // Try uploading to Firebase Storage

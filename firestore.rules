@@ -1,16 +1,98 @@
 rules_version = '2';
 service cloud.firestore {
+  // ----------------------------------------------------------------
+  // Helper functions
+  // ----------------------------------------------------------------
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isAdmin() {
+    return isSignedIn() && request.auth.token.role == 'Admin';
+  }
+
+  // ----------------------------------------------------------------
+  // Collection rules
+  // ----------------------------------------------------------------
   match /databases/{database}/documents {
+    // Connectivity probe – any signed‑in user can read (used by OfflineBanner)
+    match /connectivity/{docId} {
+      allow read: if isSignedIn();
+    }
+
+    // Users – any signed‑in user can read and write
+    match /users/{uid} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Students
+    match /students/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Classes
+    match /classes/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Subjects
+    match /subjects/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Grades
+    match /grades/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Attendance
+    match /attendance/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Fee Transactions
+    match /feeTransactions/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Lesson Plans
+    match /lessonPlans/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Approvals
+    match /approvals/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Tasks
+    match /tasks/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Timetable
+    match /timetable/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Assignments
+    match /assignments/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // ----------------------------------------------------------------
+    // Legacy / messages and announcements (preserve existing logic)
+    // ----------------------------------------------------------------
     match /messages/{messageId} {
       allow read: if request.auth != null && (request.auth.uid == resource.data.senderId || request.auth.uid == resource.data.receiverId);
       allow create: if request.auth != null && request.auth.uid == request.resource.data.senderId;
     }
     match /announcements/{announcementId} {
       allow read: if request.auth != null;
-      // Note: Assuming custom claims are used for roles, e.g., token.role
       allow create: if request.auth != null && (request.auth.token.role == 'Admin' || request.auth.token.role == 'Headmaster');
     }
-    // Default deny for other collections
+
+    // Default deny for any other collections
     match /{document=**} {
       allow read, write: if false;
     }
