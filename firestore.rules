@@ -1,20 +1,16 @@
 rules_version = '2';
-
-// ScholarHub Firestore rules.
-// IMPORTANT: the bundled Firebase apiKey is PUBLIC by design — it does NOT
-// protect data. These rules ARE the protection. Test mode (default) allows
-// anyone read/write for ~30 days; REPLACE with these before real schools use it.
-//
-// Current posture: require a signed-in user for any read/write on the school
-// doc. Until Firebase Auth is enabled in sync.js, this will BLOCK all access
-// (desired: it forces turning on Auth, not leaving it open). Once Auth is on,
-// authenticated users share the school doc. Tighten per-role next.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /schools/{schoolId} {
-      allow read, write: if request.auth != null;
+    match /messages/{messageId} {
+      allow read: if request.auth != null && (request.auth.uid == resource.data.senderId || request.auth.uid == resource.data.receiverId);
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.senderId;
     }
-    // Deny everything else by default.
+    match /announcements/{announcementId} {
+      allow read: if request.auth != null;
+      // Note: Assuming custom claims are used for roles, e.g., token.role
+      allow create: if request.auth != null && (request.auth.token.role == 'Admin' || request.auth.token.role == 'Headmaster');
+    }
+    // Default deny for other collections
     match /{document=**} {
       allow read, write: if false;
     }
