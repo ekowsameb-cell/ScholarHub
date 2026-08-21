@@ -1,1 +1,0 @@
-import{b as n,c as e,a as s,g as c,d as o}from"./D-WPYOTd.js";async function r(){return(await n(e(s,"departments"))).docs.map(a=>({...a.data(),id:a.id}))}async function d(){return(await n(e(s,"users"))).docs.map(a=>({...a.data(),uid:a.id}))}async function p(t){const a=await c(o(s,"departments",t));return a.exists()?{...a.data(),id:a.id}:null}export{d as a,p as b,r as g};
