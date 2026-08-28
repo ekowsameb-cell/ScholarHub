@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -15,13 +15,19 @@ const firebaseConfig = {
 
 export const firebaseApp = initializeApp(firebaseConfig);
 export const auth = getAuth(firebaseApp);
-// Sign in anonymously so Firestore rules that require request.auth work for offline users.
-signInAnonymously(auth).catch(err => console.error('Anonymous sign‑in error', err));
 export const db = getFirestore(firebaseApp);
-// Enable offline persistence for Firestore (works in supported browsers)
-import { enableIndexedDbPersistence } from 'firebase/firestore';
-enableIndexedDbPersistence(db).catch(err => {
-  console.error('Firestore persistence enable error', err);
-});
 export const storage = getStorage(firebaseApp);
+
+// Sign in anonymously so Firestore rules that require request.auth work for offline users.
+signInAnonymously(auth).catch(err => console.error('Anonymous sign-in error', err));
+
+// Enable offline persistence for Firestore (works in supported browsers)
+enableIndexedDbPersistence(db).catch(err => {
+  if (err.code === 'failed-precondition') {
+    console.warn('Firestore persistence unavailable: multiple tabs open.');
+  } else if (err.code === 'unimplemented') {
+    console.warn('Firestore persistence not supported in this browser.');
+  }
+});
+
 export default firebaseApp;

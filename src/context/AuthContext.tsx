@@ -24,19 +24,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     refreshUsers();
-    // Default login as Owner for easy preview
-    const allUsers = dbGetUsers();
-    const defaultUser = allUsers.find(u => u.role === 'Owner') || allUsers[0];
-    if (defaultUser) {
-      setCurrentUser(defaultUser);
+    // Restore session from sessionStorage (survives page refresh, not tab close)
+    const savedUid = sessionStorage.getItem('sh_session_uid');
+    if (savedUid) {
+      const allUsers = dbGetUsers();
+      const user = allUsers.find(u => u.uid === savedUid && u.isActive);
+      if (user) setCurrentUser(user);
     }
   }, []);
+
 
   const login = (uid: string): boolean => {
     const allUsers = dbGetUsers();
     const user = allUsers.find(u => u.uid === uid);
     if (user && user.isActive) {
       setCurrentUser(user);
+      sessionStorage.setItem('sh_session_uid', uid);
       return true;
     }
     return false;
@@ -44,7 +47,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setCurrentUser(null);
+    sessionStorage.removeItem('sh_session_uid');
   };
+
 
   const switchUserByRole = (role: User['role']) => {
     const allUsers = dbGetUsers();

@@ -134,11 +134,17 @@ const saveList = <T>(key: string, list: T[]) => {
 // Attaches onSnapshot listeners once the user is authenticated.
 // -----------------------------------------------------------------------
 const dbSync = () => {
+  let snapshotUnsubscribers: (() => void)[] = [];
+
   onAuthStateChanged(auth, (user: unknown) => {
+    // Unsubscribe any existing snapshot listeners before re-attaching
+    snapshotUnsubscribers.forEach(unsub => unsub());
+    snapshotUnsubscribers = [];
 
     if (!user) return;
+
     Object.entries(COLLECTION_MAP).forEach(([localKey, collName]) => {
-      onSnapshot(collection(db, collName), snapshot => {
+      const unsub = onSnapshot(collection(db, collName), snapshot => {
         if (snapshot.empty) return;
         const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         // Only overwrite if Firestore has more or equal data to avoid wiping local-only data
@@ -147,10 +153,13 @@ const dbSync = () => {
           localStorage.setItem(localKey, JSON.stringify(data));
         }
       }, err => console.error('onSnapshot error for', collName, err));
+      snapshotUnsubscribers.push(unsub);
     });
   });
 };
 dbSync();
+
+
 
 
 
