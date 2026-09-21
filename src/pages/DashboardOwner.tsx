@@ -23,10 +23,17 @@ export const DashboardOwner = ({ tab }: Props) => {
 
   const totalRevenue = transactions.reduce((s, t) => s + t.amountPaid, 0);
   const totalOutstanding = students.reduce((s, st) => s + (st.currentBalance || 0), 0);
+  const totalCharged = totalRevenue + totalOutstanding;
+  const momoCollected = transactions.filter(t => t.paymentMethod === 'MoMo').reduce((s, t) => s + t.amountPaid, 0);
+  const cashCollected = transactions.filter(t => t.paymentMethod === 'Cash').reduce((s, t) => s + t.amountPaid, 0);
+  
   const enrollmentCount = students.length;
   const users = dbGetUsers();
   const teacherCount = users.filter(u => u.role === 'Teacher').length;
   const classes = dbGetClasses();
+  const totalCapacity = classes.reduce((s, c) => s + (c.capacity || 35), 0);
+  const capacityPct = totalCapacity > 0 ? Math.min(100, Math.round((enrollmentCount / totalCapacity) * 100)) : 0;
+
   const grades = dbGetGrades();
   const approvedGrades = grades.filter(g => g.status === 'Approved').length;
   const pendingApprovals = approvals.filter(a => a.status === 'Pending').length;
@@ -36,26 +43,33 @@ export const DashboardOwner = ({ tab }: Props) => {
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Owner Overview</h1>
-        <p className="text-muted" style={{ fontSize: '0.85rem' }}>School-wide financial &amp; academic snapshot</p>
+        <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Executive Summary Dashboard (Owner)</h1>
+        <p className="text-muted" style={{ fontSize: '0.85rem' }}>School-wide financial, capacity &amp; academic snapshot</p>
       </div>
 
       {/* Student Activity Picker for Owner */}
       <StudentActivityPicker role="Owner" />
 
-      {/* KPI Cards */}
+      {/* Primary KPI Cards */}
       <div className="dashboard-grid">
+        <div className="glass-card stat-card">
+          <div className="stat-icon" style={{ background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)' }}><TrendingUp size={22} color="#fff" /></div>
+          <div>
+            <div className="stat-label">Total Term Billing</div>
+            <div className="stat-value">GHS {totalCharged.toLocaleString()}</div>
+          </div>
+        </div>
         <div className="glass-card stat-card">
           <div className="stat-icon" style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)' }}><DollarSign size={22} color="#fff" /></div>
           <div>
-            <div className="stat-label">Total Revenue (Term)</div>
+            <div className="stat-label">Total Revenue Collected</div>
             <div className="stat-value">GHS {totalRevenue.toLocaleString()}</div>
           </div>
         </div>
         <div className="glass-card stat-card">
           <div className="stat-icon" style={{ background: 'linear-gradient(135deg,#f97316,#ea580c)' }}><AlertCircle size={22} color="#fff" /></div>
           <div>
-            <div className="stat-label">Outstanding Balances</div>
+            <div className="stat-label">Outstanding Arrears</div>
             <div className="stat-value">GHS {totalOutstanding.toLocaleString()}</div>
           </div>
         </div>
@@ -73,6 +87,33 @@ export const DashboardOwner = ({ tab }: Props) => {
             <div className="stat-value">{teacherCount} Staff</div>
           </div>
         </div>
+      </div>
+
+      {/* Payment Stream Breakdown */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+        <div className="glass-card" style={{ padding: '1.25rem', background: 'linear-gradient(135deg, rgba(234,179,8,0.15), rgba(202,138,4,0.05))', border: '1px solid rgba(234,179,8,0.3)' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>📱 MoMo Gateway Flow</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.25rem', color: '#eab308' }}>GHS {momoCollected.toLocaleString()}</div>
+        </div>
+        <div className="glass-card" style={{ padding: '1.25rem', background: 'linear-gradient(135deg, rgba(34,197,94,0.15), rgba(22,163,74,0.05))', border: '1px solid rgba(34,197,94,0.3)' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>💵 Cash Ledger Flow</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.25rem', color: '#22c55e' }}>GHS {cashCollected.toLocaleString()}</div>
+        </div>
+        <div className="glass-card" style={{ padding: '1.25rem', background: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(220,38,38,0.05))', border: '1px solid rgba(239,68,68,0.3)' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>⚠️ Debt Collection Portfolio</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.25rem', color: '#ef4444' }}>GHS {totalOutstanding.toLocaleString()}</div>
+        </div>
+      </div>
+
+      {/* Infrastructural & Enrollment Capacity Bar */}
+      <div className="glass-card" style={{ padding: '1.5rem' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.75rem' }}>Infrastructural &amp; Enrollment Capacity</h3>
+        <div style={{ width: '100%', height: 14, background: 'var(--bg-secondary)', borderRadius: 7, overflow: 'hidden', marginBottom: '0.5rem' }}>
+          <div style={{ height: '100%', width: `${capacityPct}%`, background: 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))', borderRadius: 7, transition: 'width 0.5s ease' }} />
+        </div>
+        <p className="text-muted" style={{ fontSize: '0.82rem' }}>
+          School is currently at <strong style={{ color: 'var(--text-primary)' }}>{capacityPct}% total capacity</strong> ({enrollmentCount} enrolled students out of {totalCapacity || 100} desk openings across {classes.length} classes).
+        </p>
       </div>
 
       {/* Secondary Row */}
@@ -123,7 +164,7 @@ export const DashboardOwner = ({ tab }: Props) => {
               return (
                 <div key={cls.classId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem' }}>
                   <span>{cls.name}</span>
-                  <span className="text-muted">{classStudents.length} students</span>
+                  <span className="text-muted">{classStudents.length} / {cls.capacity || 35} students</span>
                 </div>
               );
             })}
