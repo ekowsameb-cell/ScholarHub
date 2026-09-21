@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously } from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -18,8 +18,11 @@ export const auth = getAuth(firebaseApp);
 export const db = getFirestore(firebaseApp);
 export const storage = getStorage(firebaseApp);
 
-// Sign in anonymously so Firestore rules that require request.auth work for offline users.
-signInAnonymously(auth).catch(err => console.error('Anonymous sign-in error', err));
+// Anonymous auth removed for production: it grants request.auth with NO role/schoolId
+// claims, which would let any "signed-in" client read/write every collection. Real users
+// must authenticate via the app's IdP/email/phone flow; Firestore rules then enforce the
+// role + schoolId custom claims defined in firestore.rules. Until that auth system lands,
+// ScholarHub runs fully local-first from localStorage and cloud sync is intentionally off.
 
 // Enable offline persistence for Firestore (works in supported browsers)
 enableIndexedDbPersistence(db).catch(err => {
