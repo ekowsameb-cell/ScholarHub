@@ -3,6 +3,7 @@ import {
   dbGetGrades, dbGetLessonPlans, dbGetApprovals,
   dbApproveRequest, dbRejectRequest, dbGetSubjects, dbGetUsers
 } from '../dbAdapter';
+import { StudentActivityPicker } from '../components/StudentActivityPicker';
 import type { Grade, LessonPlan, ApprovalRequest, Subject } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { CheckCircle, XCircle, BarChart2, BookOpen, Clock } from 'lucide-react';
@@ -55,6 +56,9 @@ export const DashboardHOD = ({ tab }: Props) => {
         <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>HOD Dashboard</h1>
         <p className="text-muted" style={{ fontSize: '0.85rem' }}>Department analytics, grade distribution &amp; lesson plan approvals</p>
       </div>
+
+      {/* Student Activity Picker for HOD */}
+      <StudentActivityPicker role="HOD" />
 
       {/* KPI Row */}
       <div className="dashboard-grid">

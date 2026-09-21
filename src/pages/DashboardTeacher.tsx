@@ -7,7 +7,9 @@ import {
 } from '../dbAdapter';
 import type { Student, Subject, Grade, LessonPlan, TimetableSlot } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
-import { Users, BookOpen, ClipboardCheck, CheckCircle, Send, FileText, PenLine, Calendar } from 'lucide-react';
+import { StudentActivityPicker } from '../components/StudentActivityPicker';
+import { StudentProfileModal } from '../components/StudentProfileModal';
+import { Users, BookOpen, ClipboardCheck, CheckCircle, Send, FileText, PenLine, Calendar, Eye } from 'lucide-react';
 
 interface Props { tab: string; }
 
@@ -18,6 +20,7 @@ export const DashboardTeacher = ({ tab }: Props) => {
   const [grades, setGrades] = useState<Grade[]>([]);
   const [plans, setPlans] = useState<LessonPlan[]>([]);
   const [timetableSlots, setTimetableSlots] = useState<TimetableSlot[]>([]);
+  const [viewingStudentProfile, setViewingStudentProfile] = useState<Student | null>(null);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, 'Present' | 'Absent' | 'Late'>>({});
   const [attendanceSaved, setAttendanceSaved] = useState(false);
@@ -143,6 +146,9 @@ export const DashboardTeacher = ({ tab }: Props) => {
         <p className="text-muted" style={{ fontSize: '0.85rem' }}>Attendance, gradebook &amp; AI lesson planner</p>
       </div>
 
+      {/* Student Activity Picker for Teacher */}
+      <StudentActivityPicker role="Teacher" />
+
       {/* KPI Strip */}
       <div className="dashboard-grid">
         <div className="glass-card stat-card">
@@ -208,7 +214,13 @@ export const DashboardTeacher = ({ tab }: Props) => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
             {students.map(st => (
               <div key={st.studentId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}>
-                <span style={{ fontWeight: 600 }}>{st.fullName}</span>
+                <span
+                  style={{ fontWeight: 600, color: 'var(--accent-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  onClick={() => setViewingStudentProfile(st)}
+                  title="Click to view student profile details"
+                >
+                  <Eye size={14} /> {st.fullName}
+                </span>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>
                   {(['Present', 'Late', 'Absent'] as const).map(status => (
                     <button
@@ -403,6 +415,13 @@ export const DashboardTeacher = ({ tab }: Props) => {
             </table>
           </div>
         </div>
+      )}
+      {/* STUDENT PROFILE DETAIL MODAL */}
+      {viewingStudentProfile && (
+        <StudentProfileModal
+          student={viewingStudentProfile}
+          onClose={() => setViewingStudentProfile(null)}
+        />
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import {
   dbGetStudents, dbGetClasses, dbGetApprovals, dbGetUsers,
   dbApproveRequest, dbRejectRequest, dbGetGrades, dbGetAttendance
 } from '../dbAdapter';
+import { StudentActivityPicker } from '../components/StudentActivityPicker';
 import type { ApprovalRequest, Student } from '../data/mockData';
 import { Users, BookOpen, CheckCircle, XCircle, TrendingUp, AlertCircle } from 'lucide-react';
 
@@ -58,6 +59,9 @@ export const DashboardHeadmaster = ({ tab }: Props) => {
         <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Headmaster Dashboard</h1>
         <p className="text-muted" style={{ fontSize: '0.85rem' }}>School performance, attendance &amp; approval management</p>
       </div>
+
+      {/* Student Activity Picker for Headmaster */}
+      <StudentActivityPicker role="Headmaster" />
 
       {/* KPI Row */}
       <div className="dashboard-grid">

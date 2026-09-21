@@ -7,11 +7,12 @@ import { onAuthStateChanged } from 'firebase/auth';
 import {
   mockUsers, mockStudents, mockClasses, mockSubjects, mockGrades,
   mockAttendance, mockFeeTransactions, mockLessonPlans, mockTasks,
-  mockApprovals, mockTimetableSlots, calculateWAECGrade,
+  mockApprovals, mockTimetableSlots, mockMessages, mockAnnouncements, calculateWAECGrade,
   // Type imports
   type User, type Student, type Class, type Subject, type Grade,
   type AttendanceRecord, type FeeTransaction, type LessonPlan,
   type Task, type ApprovalRequest, type TimetableSlot,
+  type ChatMessage, type Announcement,
 } from './data/mockData';
 
 
@@ -53,6 +54,8 @@ export const dbInit = () => {
   getOrInit<Task>('sh_tasks', mockTasks);
   getOrInit<ApprovalRequest>('sh_approvals', mockApprovals);
   getOrInit<TimetableSlot>('sh_timetable', mockTimetableSlots);
+  getOrInit<ChatMessage>('sh_messages', mockMessages);
+  getOrInit<Announcement>('sh_announcements', mockAnnouncements);
 };
 
 // Initialize DB immediately
@@ -635,4 +638,63 @@ export const dbGenerateTimetable = (): TimetableSlot[] => {
 
   dbSaveTimetableSlots(generatedSlots);
   return generatedSlots;
+};
+
+// MESSAGES & ANNOUNCEMENTS
+export const dbGetMessages = (): ChatMessage[] => getList<ChatMessage>('sh_messages');
+
+export const dbSendMessage = async (msg: Omit<ChatMessage, 'id' | 'timestamp'>): Promise<ChatMessage> => {
+  const messages = dbGetMessages();
+  const newMsg: ChatMessage = {
+    ...msg,
+    id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    timestamp: new Date().toISOString()
+  };
+  messages.push(newMsg);
+  saveList('sh_messages', messages);
+  window.dispatchEvent(new Event('sh_data_updated'));
+
+  // Try sync with Firestore silently
+  try {
+    const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
+    await addDoc(collection(db, 'messages'), {
+      senderId: msg.senderId,
+      receiverId: msg.receiverId,
+      content: msg.content,
+      timestamp: serverTimestamp()
+    });
+  } catch (err) {
+    console.warn('[dbSendMessage] Firestore sync skipped/failed, saved to local storage:', err);
+  }
+
+  return newMsg;
+};
+
+export const dbGetAnnouncements = (): Announcement[] => getList<Announcement>('sh_announcements');
+
+export const dbPostAnnouncement = async (ann: Omit<Announcement, 'id' | 'timestamp'>): Promise<Announcement> => {
+  const announcements = dbGetAnnouncements();
+  const newAnn: Announcement = {
+    ...ann,
+    id: `ann-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    timestamp: new Date().toISOString()
+  };
+  announcements.unshift(newAnn);
+  saveList('sh_announcements', announcements);
+  window.dispatchEvent(new Event('sh_data_updated'));
+
+  // Try sync with Firestore silently
+  try {
+    const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
+    await addDoc(collection(db, 'announcements'), {
+      content: ann.content,
+      authorRole: ann.authorRole,
+      authorName: ann.authorName || '',
+      timestamp: serverTimestamp()
+    });
+  } catch (err) {
+    console.warn('[dbPostAnnouncement] Firestore sync skipped/failed, saved to local storage:', err);
+  }
+
+  return newAnn;
 };

@@ -6,7 +6,9 @@ import {
 } from '../dbAdapter';
 import type { Student, User, ApprovalRequest, Subject, TimetableSlot } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
-import { UserPlus, Users, Search, CheckCircle, Shield, Phone, Mail, Edit, Send, Calendar, Zap, BookOpen } from 'lucide-react';
+import { StudentActivityPicker } from '../components/StudentActivityPicker';
+import { StudentProfileModal } from '../components/StudentProfileModal';
+import { UserPlus, Users, Search, CheckCircle, Shield, Phone, Mail, Edit, Send, Calendar, Zap, BookOpen, Eye } from 'lucide-react';
 
 interface Props { tab: string; }
 
@@ -29,6 +31,7 @@ export const DashboardAdmin = ({ tab }: Props) => {
   const [showStaffModal, setShowStaffModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [editingStaff, setEditingStaff] = useState<User | null>(null);
+  const [viewingStudentProfile, setViewingStudentProfile] = useState<Student | null>(null);
 
   // New Student Form State
   const [stFullName, setStFullName] = useState('');
@@ -161,6 +164,9 @@ export const DashboardAdmin = ({ tab }: Props) => {
         <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>School Administration &amp; Onboarding</h1>
         <p className="text-muted" style={{ fontSize: '0.85rem' }}>Search records, manage staff subjects, timetable generation &amp; onboarding approvals</p>
       </div>
+
+      {/* Student Activity Picker for Admin */}
+      <StudentActivityPicker role="Admin" />
 
       {notifyMsg && (
         <div style={{ padding: '0.75rem 1rem', background: 'rgba(34,197,94,0.12)', border: '1px solid #22c55e', borderRadius: 'var(--radius-sm)', color: '#22c55e', fontWeight: 600, fontSize: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -343,16 +349,27 @@ export const DashboardAdmin = ({ tab }: Props) => {
                     return (
                       <tr key={s.studentId}>
                         <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{s.studentId}</td>
-                        <td style={{ fontWeight: 600 }}>{s.fullName}</td>
+                        <td
+                          style={{ fontWeight: 600, color: 'var(--accent-primary)', cursor: 'pointer', textDecoration: 'underline' }}
+                          onClick={() => setViewingStudentProfile(s)}
+                          title="Click to view full student profile details"
+                        >
+                          {s.fullName}
+                        </td>
                         <td>{cls?.name || s.classId}</td>
                         <td><span className="badge badge-info">{s.house}</span></td>
                         <td style={{ fontWeight: 700, color: s.currentBalance > 0 ? '#ef4444' : '#22c55e' }}>
                           GHS {s.currentBalance.toLocaleString()}
                         </td>
                         <td>
-                          <button className="btn btn-secondary" style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem' }} onClick={() => setEditingStudent(s)}>
-                            <Edit size={13} /> Edit / Update
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            <button className="btn btn-secondary" style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem' }} onClick={() => setViewingStudentProfile(s)}>
+                              <Eye size={13} /> View Profile
+                            </button>
+                            <button className="btn btn-secondary" style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem' }} onClick={() => setEditingStudent(s)}>
+                              <Edit size={13} /> Edit
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -689,6 +706,13 @@ export const DashboardAdmin = ({ tab }: Props) => {
             </form>
           </div>
         </div>
+      )}
+      {/* STUDENT PROFILE DETAIL MODAL */}
+      {viewingStudentProfile && (
+        <StudentProfileModal
+          student={viewingStudentProfile}
+          onClose={() => setViewingStudentProfile(null)}
+        />
       )}
     </div>
   );

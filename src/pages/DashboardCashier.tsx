@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { dbGetStudents, dbGetTransactions, dbRecordPayment } from '../dbAdapter';
 import type { Student, FeeTransaction } from '../data/mockData';
-import { Search, DollarSign, Receipt, CheckCircle, Smartphone, Banknote } from 'lucide-react';
+import { StudentActivityPicker } from '../components/StudentActivityPicker';
+import { StudentProfileModal } from '../components/StudentProfileModal';
+import { Search, DollarSign, Receipt, CheckCircle, Smartphone, Banknote, Eye } from 'lucide-react';
 
 interface Props { tab: string; }
 
@@ -15,6 +17,7 @@ export const DashboardCashier = ({ tab }: Props) => {
   const [items, setItems] = useState('Term 1 Tuition');
   const [processing, setProcessing] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<FeeTransaction | null>(null);
+  const [viewingStudentProfile, setViewingStudentProfile] = useState<Student | null>(null);
 
   const reload = () => {
     setStudents(dbGetStudents());
@@ -53,6 +56,12 @@ export const DashboardCashier = ({ tab }: Props) => {
         <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Cashier POS</h1>
         <p className="text-muted" style={{ fontSize: '0.85rem' }}>Fee collection point of sale — Cash &amp; Mobile Money</p>
       </div>
+
+      {/* Student Activity Picker for Cashier */}
+      <StudentActivityPicker
+        role="Cashier"
+        onSelectStudent={st => { setSelectedStudent(st); setSearchQuery(st.fullName); }}
+      />
 
       {/* KPI Row */}
       <div className="dashboard-grid">
@@ -136,12 +145,21 @@ export const DashboardCashier = ({ tab }: Props) => {
                   <div className="text-muted" style={{ fontSize: '0.75rem' }}>Outstanding</div>
                 </div>
               </div>
-              <button
-                onClick={() => { setSelectedStudent(null); setSearchQuery(''); }}
-                style={{ marginTop: '0.5rem', fontSize: '0.72rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                ✕ Clear Selection
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  onClick={() => setViewingStudentProfile(selectedStudent)}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem' }}
+                >
+                  <Eye size={12} /> View Full Profile
+                </button>
+                <button
+                  onClick={() => { setSelectedStudent(null); setSearchQuery(''); }}
+                  style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  ✕ Clear Selection
+                </button>
+              </div>
             </div>
           )}
 
@@ -198,27 +216,50 @@ export const DashboardCashier = ({ tab }: Props) => {
               <p><strong>Receipt:</strong> {lastReceipt.receiptNumber}</p>
               <p><strong>Amount:</strong> GHS {lastReceipt.amountPaid.toLocaleString()} via {lastReceipt.paymentMethod}</p>
               <p><strong>Items:</strong> {lastReceipt.itemsPaidFor}</p>
-              <a
-                href={`https://wa.me/233000000000?text=${encodeURIComponent(
-                  `📧 ScholarHub ERP - Fee Receipt\n` +
-                  `Receipt: ${lastReceipt.receiptNumber}\n` +
-                  `Student: ${selectedStudent?.fullName || 'N/A'}\n` +
-                  `Amount Paid: GHS ${lastReceipt.amountPaid.toLocaleString()}\n` +
-                  `Method: ${lastReceipt.paymentMethod}\n` +
-                  `Items: ${lastReceipt.itemsPaidFor}\n` +
-                  `Thank you for your payment!`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-                  marginTop: '0.75rem', padding: '0.5rem 1rem',
-                  background: '#25D366', color: '#fff', borderRadius: 'var(--radius-sm)',
-                  textDecoration: 'none', fontWeight: 600, fontSize: '0.82rem'
-                }}
-              >
-                📱 Send WhatsApp Receipt
-              </a>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+                <a
+                  href={`https://wa.me/233241234567?text=${encodeURIComponent(
+                    `📧 ScholarHub ERP - Fee Receipt\n` +
+                    `Receipt: ${lastReceipt.receiptNumber}\n` +
+                    `Student: ${selectedStudent?.fullName || 'N/A'}\n` +
+                    `Amount Paid: GHS ${lastReceipt.amountPaid.toLocaleString()}\n` +
+                    `Method: ${lastReceipt.paymentMethod}\n` +
+                    `Items: ${lastReceipt.itemsPaidFor}\n` +
+                    `Thank you for your payment!`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                    padding: '0.5rem 0.85rem',
+                    background: '#25D366', color: '#fff', borderRadius: 'var(--radius-sm)',
+                    textDecoration: 'none', fontWeight: 600, fontSize: '0.8rem'
+                  }}
+                >
+                  📱 Send WhatsApp Receipt
+                </a>
+                <button
+                  onClick={async () => {
+                    const { sendReceiptSMS, getParentPhoneForStudent } = await import('../services/smsService');
+                    const parent = getParentPhoneForStudent(selectedStudent?.parentId || '');
+                    await sendReceiptSMS({
+                      studentName: selectedStudent?.fullName || 'Student',
+                      parentName: parent.name,
+                      parentPhone: parent.phone,
+                      receiptNumber: lastReceipt.receiptNumber,
+                      amountPaid: lastReceipt.amountPaid,
+                      paymentMethod: lastReceipt.paymentMethod,
+                      itemsPaidFor: lastReceipt.itemsPaidFor,
+                      remainingBalance: selectedStudent?.currentBalance || 0
+                    });
+                    alert(`📲 SMS Receipt dispatched to ${parent.phone}!`);
+                  }}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.8rem', padding: '0.5rem 0.85rem' }}
+                >
+                  📲 Send SMS Receipt
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -247,6 +288,13 @@ export const DashboardCashier = ({ tab }: Props) => {
           </div>
         </div>
       </div>
+      {/* STUDENT PROFILE DETAIL MODAL */}
+      {viewingStudentProfile && (
+        <StudentProfileModal
+          student={viewingStudentProfile}
+          onClose={() => setViewingStudentProfile(null)}
+        />
+      )}
     </div>
   );
 };

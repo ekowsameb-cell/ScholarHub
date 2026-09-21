@@ -111,6 +111,22 @@ export interface TimetableSlot {
   teacherId: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  receiverId: string; // 'all' or user uid
+  content: string;
+  timestamp: string;
+}
+
+export interface Announcement {
+  id: string;
+  content: string;
+  authorRole: string;
+  authorName?: string;
+  timestamp: string;
+}
+
 export const mockTimetableSlots: TimetableSlot[] = [
   // Monday
   { slotId: 'tt-1', day: 'Monday', period: '08:00 AM - 09:00 AM', classId: 'c-jhs1', subjectId: 'sub-math1', teacherId: 'u-teacher1' },
@@ -277,5 +293,46 @@ export const mockApprovals: ApprovalRequest[] = [
     status: 'Pending',
     dataSnapshot: { planId: 'lp-002', topic: 'Classification of Materials', strand: 'Diversity of Matter' },
     timestamp: '2026-08-18T16:45:00Z'
+  }
+];
+
+export const mockMessages: ChatMessage[] = [
+  {
+    id: 'msg-1',
+    senderId: 'u-head',
+    receiverId: 'all',
+    content: 'Welcome to Term 1! Please ensure all lesson plans are submitted to HODs by end of week.',
+    timestamp: '2026-08-18T08:30:00Z'
+  },
+  {
+    id: 'msg-2',
+    senderId: 'u-admin',
+    receiverId: 'u-teacher1',
+    content: 'Hi Mr. Lamptey, your class JHS 1 timetable has been updated in the system.',
+    timestamp: '2026-08-18T09:15:00Z'
+  },
+  {
+    id: 'msg-3',
+    senderId: 'u-teacher1',
+    receiverId: 'u-admin',
+    content: 'Thank you Admin, I have reviewed the timetable schedule.',
+    timestamp: '2026-08-18T09:40:00Z'
+  }
+];
+
+export const mockAnnouncements: Announcement[] = [
+  {
+    id: 'ann-1',
+    content: '📢 Staff General Meeting scheduled for Friday at 2:00 PM in the Main Conference Room.',
+    authorRole: 'Headmaster',
+    authorName: 'Mr. Emmanuel Osei',
+    timestamp: '2026-08-18T08:00:00Z'
+  },
+  {
+    id: 'ann-2',
+    content: '🗓️ Mid-term examinations commence on October 12th. All teachers should prepare draft papers.',
+    authorRole: 'Admin',
+    authorName: 'System Administrator',
+    timestamp: '2026-08-17T14:20:00Z'
   }
 ];

@@ -4,6 +4,7 @@ import {
   dbGetClasses, dbGetGrades, dbGetApprovals,
   dbApproveRequest, dbRejectRequest
 } from '../dbAdapter';
+import { StudentActivityPicker } from '../components/StudentActivityPicker';
 import type { FeeTransaction, Student } from '../data/mockData';
 import { TrendingUp, Users, BookOpen, AlertCircle, DollarSign, CheckCircle, Clock, XCircle } from 'lucide-react';
 
@@ -38,6 +39,9 @@ export const DashboardOwner = ({ tab }: Props) => {
         <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Owner Overview</h1>
         <p className="text-muted" style={{ fontSize: '0.85rem' }}>School-wide financial &amp; academic snapshot</p>
       </div>
+
+      {/* Student Activity Picker for Owner */}
+      <StudentActivityPicker role="Owner" />
 
       {/* KPI Cards */}
       <div className="dashboard-grid">

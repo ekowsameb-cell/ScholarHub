@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { dbGetStudents, dbGetGrades, dbGetTransactions, dbGetAttendance, dbRecordPayment } from '../dbAdapter';
-import type { Student, Grade, FeeTransaction } from '../data/mockData';
+import React, { useState, useEffect } from 'react';
+import { dbGetStudents, dbGetGrades, dbGetTransactions, dbGetAttendance, dbRecordPayment, dbGetUsers } from '../dbAdapter';
+import type { Student, Grade, FeeTransaction, User } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
-import { Users, DollarSign, TrendingUp, ClipboardCheck, Smartphone, Banknote, CheckCircle } from 'lucide-react';
+import { StudentProfileModal } from '../components/StudentProfileModal';
+import { Users, DollarSign, TrendingUp, ClipboardCheck, Smartphone, Banknote, CheckCircle, Eye } from 'lucide-react';
 import { calculateWAECGrade } from '../data/mockData';
 
 interface Props { tab: string; }
@@ -19,10 +20,23 @@ export const DashboardParent = ({ tab }: Props) => {
   const [paying, setPaying] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<FeeTransaction | null>(null);
   const [showPayDrawer, setShowPayDrawer] = useState(false);
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [wardInputName, setWardInputName] = useState('');
+  const [wardInputPhone, setWardInputPhone] = useState(currentUser?.phone || '');
+  const [linkFeedback, setLinkFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [viewingStudentProfile, setViewingStudentProfile] = useState<Student | null>(null);
 
   const reload = () => {
     const allStudents = dbGetStudents();
-    const myWards = allStudents.filter(s => s.parentId === currentUser?.uid);
+    // Get manually linked wards from localStorage
+    let linkedIds: string[] = [];
+    try {
+      linkedIds = JSON.parse(localStorage.getItem(`sh_linked_wards_${currentUser?.uid}`) || '[]');
+    } catch { linkedIds = []; }
+
+    const myWards = allStudents.filter(
+      s => s.parentId === currentUser?.uid || linkedIds.includes(s.studentId)
+    );
     setWards(myWards);
     if (myWards.length > 0 && !selectedWard) setSelectedWard(myWards[0]);
     setGrades(dbGetGrades());
@@ -54,6 +68,55 @@ export const DashboardParent = ({ tab }: Props) => {
     setPaying(false);
   };
 
+  const handleVerifyAndLinkWard = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!wardInputName.trim() || !wardInputPhone.trim()) return;
+
+    const allStudents = dbGetStudents();
+    const cleanSearchName = wardInputName.trim().toLowerCase();
+    const cleanPhone = wardInputPhone.replace(/\D/g, '');
+
+    // Search for student matching name or student ID
+    const matchedStudent = allStudents.find(s => {
+      const nameMatch = s.fullName.toLowerCase().includes(cleanSearchName) || s.studentId.toLowerCase() === cleanSearchName;
+      if (!nameMatch) return false;
+
+      // Match phone against student's parent contact, parent user phone, or whatsapp number
+      const parentUser = dbGetUsers().find((u: User) => u.uid === s.parentId);
+      const parentPhoneClean = (parentUser?.phone || s.parentContact || s.whatsappNumber || '+233241234567').replace(/\D/g, '');
+
+      // Match if last 8 digits of phone numbers match or phone contains query
+      return parentPhoneClean.slice(-8) === cleanPhone.slice(-8) || parentPhoneClean.includes(cleanPhone) || cleanPhone.includes(parentPhoneClean.slice(-8));
+    });
+
+    if (matchedStudent) {
+      // Save linked ward ID in localStorage
+      let linkedIds: string[] = [];
+      try {
+        linkedIds = JSON.parse(localStorage.getItem(`sh_linked_wards_${currentUser?.uid}`) || '[]');
+      } catch { linkedIds = []; }
+
+      if (!linkedIds.includes(matchedStudent.studentId)) {
+        linkedIds.push(matchedStudent.studentId);
+        localStorage.setItem(`sh_linked_wards_${currentUser?.uid}`, JSON.stringify(linkedIds));
+      }
+
+      setLinkFeedback({
+        type: 'success',
+        text: `✓ Ward verified! Access unlocked for ${matchedStudent.fullName} (${matchedStudent.house}).`
+      });
+      setShowLinkForm(false);
+      setWardInputName('');
+      setSelectedWard(matchedStudent);
+      reload();
+    } else {
+      setLinkFeedback({
+        type: 'error',
+        text: `❌ Verification failed. Could not find an enrolled ward matching "${wardInputName}" with registered phone "${wardInputPhone}". Please check the details or contact the school administration.`
+      });
+    }
+  };
+
   const gradeColor = (grade: string) => {
     if (grade.startsWith('A')) return '#22c55e';
     if (grade.startsWith('B')) return '#6366f1';
@@ -64,10 +127,76 @@ export const DashboardParent = ({ tab }: Props) => {
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Parent Portal</h1>
-        <p className="text-muted" style={{ fontSize: '0.85rem' }}>Ward performance, attendance &amp; fee payment</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Parent Portal</h1>
+          <p className="text-muted" style={{ fontSize: '0.85rem' }}>Read-only ward performance, attendance &amp; fee statement</p>
+        </div>
+        <button
+          className={`btn ${showLinkForm ? 'btn-secondary' : 'btn-primary'}`}
+          onClick={() => setShowLinkForm(v => !v)}
+          style={{ fontSize: '0.82rem' }}
+        >
+          {showLinkForm ? '✕ Close Link Form' : '🔗 Link Ward by Registered Phone'}
+        </button>
       </div>
+
+      {/* Feedback Banner */}
+      {linkFeedback && (
+        <div style={{
+          padding: '0.85rem 1rem',
+          borderRadius: 'var(--radius-sm)',
+          background: linkFeedback.type === 'success' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+          border: `1px solid ${linkFeedback.type === 'success' ? '#10b981' : '#ef4444'}`,
+          color: linkFeedback.type === 'success' ? '#10b981' : '#ef4444',
+          fontWeight: 600, fontSize: '0.85rem'
+        }}>
+          {linkFeedback.text}
+        </div>
+      )}
+
+      {/* Ward Link Verification Form */}
+      {showLinkForm && (
+        <div className="glass-card" style={{ padding: '1.5rem', background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.06))', border: '1px solid rgba(99,102,241,0.3)' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+            🔗 Verify &amp; Unlock Ward Profile Access
+          </h3>
+          <p className="text-muted" style={{ fontSize: '0.82rem', marginBottom: '1rem' }}>
+            Enter your ward's full name and the telephone number registered with the school to unlock read-only access to their profile and academic report.
+          </p>
+          <form onSubmit={handleVerifyAndLinkWard} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', alignItems: 'end' }}>
+            <div>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                Ward's Full Name or Student ID:
+              </label>
+              <input
+                className="input-field"
+                placeholder="e.g. Kojo Awuah or s-001"
+                value={wardInputName}
+                onChange={e => setWardInputName(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                Registered Parent Phone Number:
+              </label>
+              <input
+                className="input-field"
+                placeholder="e.g. +233241234567 or 0241234567"
+                value={wardInputPhone}
+                onChange={e => setWardInputPhone(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                Verify &amp; Access Read-Only Profile
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Ward Selector */}
       {wards.length > 1 && (
@@ -87,9 +216,12 @@ export const DashboardParent = ({ tab }: Props) => {
         </div>
       )}
 
-      {!selectedWard && wards.length === 0 && (
+      {!selectedWard && wards.length === 0 && !showLinkForm && (
         <div className="glass-card" style={{ padding: '2rem', textAlign: 'center' }}>
-          <p className="text-muted">No wards linked to your account.</p>
+          <p className="text-muted" style={{ marginBottom: '1rem' }}>No wards currently linked to your account.</p>
+          <button className="btn btn-primary" onClick={() => setShowLinkForm(true)}>
+            🔗 Verify Ward Name &amp; Phone Number
+          </button>
         </div>
       )}
 
@@ -106,12 +238,20 @@ export const DashboardParent = ({ tab }: Props) => {
                 <div className="text-muted" style={{ fontSize: '0.82rem' }}>{selectedWard.house} · ID: {selectedWard.studentId}</div>
               </div>
             </div>
-            <button
-              className="btn btn-primary"
-              onClick={() => { setShowPayDrawer(v => !v); setLastReceipt(null); }}
-            >
-              <DollarSign size={16} /> {showPayDrawer ? 'Close' : 'Pay Fees'}
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setViewingStudentProfile(selectedWard)}
+              >
+                <Eye size={16} /> View Full Profile
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => { setShowPayDrawer(v => !v); setLastReceipt(null); }}
+              >
+                <DollarSign size={16} /> {showPayDrawer ? 'Close' : 'Pay Fees'}
+              </button>
+            </div>
           </div>
 
           {/* Pay Drawer */}
@@ -235,6 +375,13 @@ export const DashboardParent = ({ tab }: Props) => {
             </div>
           </div>
         </>
+      )}
+      {/* STUDENT PROFILE DETAIL MODAL */}
+      {viewingStudentProfile && (
+        <StudentProfileModal
+          student={viewingStudentProfile}
+          onClose={() => setViewingStudentProfile(null)}
+        />
       )}
     </div>
   );
