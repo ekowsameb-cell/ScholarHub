@@ -6,7 +6,8 @@ import {
 import { StudentActivityPicker } from '../components/StudentActivityPicker';
 import type { Grade, LessonPlan, ApprovalRequest, Subject } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
-import { CheckCircle, XCircle, BarChart2, BookOpen, Clock } from 'lucide-react';
+import { CheckCircle, XCircle, BarChart2, BookOpen, Clock, FileText } from 'lucide-react';
+import { generateHODReport } from '../utils/reportGenerator';
 
 
 interface Props { tab: string; }
@@ -62,9 +63,18 @@ export const DashboardHOD = ({ tab }: Props) => {
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Departmental Management Console (HOD)</h1>
-        <p className="text-muted" style={{ fontSize: '0.85rem' }}>Department analytics, quality rating, grade auditing &amp; lesson plan approvals</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Departmental Management Console (HOD)</h1>
+          <p className="text-muted" style={{ fontSize: '0.85rem' }}>Department analytics, quality rating, grade auditing &amp; lesson plan approvals</p>
+        </div>
+        <button
+          className="btn btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)' }}
+          onClick={() => generateHODReport(currentUser)}
+        >
+          <FileText size={16} /> Generate Department Audit Report
+        </button>
       </div>
 
       {/* Student Activity Picker for HOD */}

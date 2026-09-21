@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { StudentActivityPicker } from '../components/StudentActivityPicker';
 import { StudentProfileModal } from '../components/StudentProfileModal';
 import { Users, BookOpen, ClipboardCheck, CheckCircle, Send, FileText, PenLine, Calendar, Eye } from 'lucide-react';
+import { generateTeacherReport } from '../utils/reportGenerator';
 
 interface Props { tab: string; }
 
@@ -141,9 +142,18 @@ export const DashboardTeacher = ({ tab }: Props) => {
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Teacher Workspace</h1>
-        <p className="text-muted" style={{ fontSize: '0.85rem' }}>Attendance, gradebook &amp; AI lesson planner</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Teacher Workspace</h1>
+          <p className="text-muted" style={{ fontSize: '0.85rem' }}>Attendance, gradebook &amp; AI lesson planner</p>
+        </div>
+        <button
+          className="btn btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)' }}
+          onClick={() => generateTeacherReport(currentUser)}
+        >
+          <FileText size={16} /> Generate Classroom Dossier
+        </button>
       </div>
 
       {/* Student Activity Picker for Teacher */}

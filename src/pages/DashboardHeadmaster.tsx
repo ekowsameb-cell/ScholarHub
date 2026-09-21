@@ -5,7 +5,8 @@ import {
 } from '../dbAdapter';
 import { StudentActivityPicker } from '../components/StudentActivityPicker';
 import type { ApprovalRequest, Student } from '../data/mockData';
-import { Users, BookOpen, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Users, BookOpen, CheckCircle, XCircle, AlertCircle, FileText } from 'lucide-react';
+import { generateHeadmasterReport } from '../utils/reportGenerator';
 
 interface Props { tab: string; }
 
@@ -68,9 +69,18 @@ export const DashboardHeadmaster = ({ tab }: Props) => {
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Academic Excellence &amp; Quality Assurance (Headmaster)</h1>
-        <p className="text-muted" style={{ fontSize: '0.85rem' }}>School performance, NaSIA compliance, attendance &amp; lesson note approvals</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Academic Excellence &amp; Quality Assurance (Headmaster)</h1>
+          <p className="text-muted" style={{ fontSize: '0.85rem' }}>School performance, NaSIA compliance, attendance &amp; lesson note approvals</p>
+        </div>
+        <button
+          onClick={generateHeadmasterReport}
+          className="btn btn-primary"
+          style={{ fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}
+        >
+          <FileText size={16} /> 📄 Generate Academic Audit Report
+        </button>
       </div>
 
       {/* Student Activity Picker for Headmaster */}

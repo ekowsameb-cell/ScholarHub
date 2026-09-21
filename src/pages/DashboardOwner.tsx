@@ -6,7 +6,8 @@ import {
 } from '../dbAdapter';
 import { StudentActivityPicker } from '../components/StudentActivityPicker';
 import type { FeeTransaction, Student } from '../data/mockData';
-import { TrendingUp, Users, BookOpen, AlertCircle, DollarSign, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { TrendingUp, Users, BookOpen, AlertCircle, DollarSign, CheckCircle, Clock, XCircle, FileText } from 'lucide-react';
+import { generateOwnerReport } from '../utils/reportGenerator';
 
 interface Props { tab: string; }
 
@@ -42,9 +43,18 @@ export const DashboardOwner = ({ tab }: Props) => {
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Executive Summary Dashboard (Owner)</h1>
-        <p className="text-muted" style={{ fontSize: '0.85rem' }}>School-wide financial, capacity &amp; academic snapshot</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Executive Summary Dashboard (Owner)</h1>
+          <p className="text-muted" style={{ fontSize: '0.85rem' }}>School-wide financial, capacity &amp; academic snapshot</p>
+        </div>
+        <button
+          onClick={generateOwnerReport}
+          className="btn btn-primary"
+          style={{ fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}
+        >
+          <FileText size={16} /> 📄 Generate Executive Audit Report
+        </button>
       </div>
 
       {/* Student Activity Picker for Owner */}

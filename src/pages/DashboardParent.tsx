@@ -3,7 +3,8 @@ import { dbGetStudents, dbGetGrades, dbGetTransactions, dbGetAttendance, dbRecor
 import type { Student, Grade, FeeTransaction, User } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { StudentProfileModal } from '../components/StudentProfileModal';
-import { Users, DollarSign, TrendingUp, ClipboardCheck, Smartphone, Banknote, CheckCircle, Eye } from 'lucide-react';
+import { Users, DollarSign, TrendingUp, ClipboardCheck, Smartphone, Banknote, CheckCircle, Eye, FileText } from 'lucide-react';
+import { generateParentReport } from '../utils/reportGenerator';
 import { calculateWAECGrade } from '../data/mockData';
 
 interface Props { tab: string; }
@@ -132,13 +133,24 @@ export const DashboardParent = ({ tab }: Props) => {
           <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem' }}>Parent Portal</h1>
           <p className="text-muted" style={{ fontSize: '0.85rem' }}>Read-only ward performance, attendance &amp; fee statement</p>
         </div>
-        <button
-          className={`btn ${showLinkForm ? 'btn-secondary' : 'btn-primary'}`}
-          onClick={() => setShowLinkForm(v => !v)}
-          style={{ fontSize: '0.82rem' }}
-        >
-          {showLinkForm ? '✕ Close Link Form' : '🔗 Link Ward by Registered Phone'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {selectedWard && (
+            <button
+              className="btn btn-primary"
+              onClick={() => generateParentReport(selectedWard, currentUser)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)' }}
+            >
+              <FileText size={16} /> Generate Ward Terminal Report
+            </button>
+          )}
+          <button
+            className={`btn ${showLinkForm ? 'btn-secondary' : 'btn-primary'}`}
+            onClick={() => setShowLinkForm(v => !v)}
+            style={{ fontSize: '0.82rem' }}
+          >
+            {showLinkForm ? '✕ Close Link Form' : '🔗 Link Ward by Registered Phone'}
+          </button>
+        </div>
       </div>
 
       {/* Feedback Banner */}
@@ -238,12 +250,18 @@ export const DashboardParent = ({ tab }: Props) => {
                 <div className="text-muted" style={{ fontSize: '0.82rem' }}>{selectedWard.house} · ID: {selectedWard.studentId}</div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <button
                 className="btn btn-secondary"
                 onClick={() => setViewingStudentProfile(selectedWard)}
               >
                 <Eye size={16} /> View Full Profile
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => generateParentReport(selectedWard, currentUser)}
+              >
+                <FileText size={16} /> Print Report
               </button>
               <button
                 className="btn btn-primary"
