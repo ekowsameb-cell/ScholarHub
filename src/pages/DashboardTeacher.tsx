@@ -149,6 +149,47 @@ export const DashboardTeacher = ({ tab }: Props) => {
       {/* Student Activity Picker for Teacher */}
       <StudentActivityPicker role="Teacher" />
 
+      {/* Quick Action Hub */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+        <div
+          onClick={() => setActiveSection('attendance')}
+          className="glass-card"
+          style={{
+            padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer',
+            border: activeSection === 'attendance' ? '2px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(99,102,241,0.03))',
+            transition: 'all 0.2s'
+          }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 'var(--radius-sm)', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+            <ClipboardCheck size={24} />
+          </div>
+          <div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Take Class Attendance</h3>
+            <p className="text-muted" style={{ fontSize: '0.78rem', marginTop: 2 }}>Log today's present, absent, and late rosters natively.</p>
+          </div>
+        </div>
+
+        <div
+          onClick={() => setActiveSection('grades')}
+          className="glass-card"
+          style={{
+            padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer',
+            border: activeSection === 'grades' ? '2px solid #22c55e' : '1px solid var(--glass-border)',
+            background: 'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(34,197,94,0.03))',
+            transition: 'all 0.2s'
+          }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 'var(--radius-sm)', background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+            <PenLine size={24} />
+          </div>
+          <div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Bulk Assessment Entry Grid</h3>
+            <p className="text-muted" style={{ fontSize: '0.78rem', marginTop: 2 }}>Input termly SBA marks and end-of-term exam scores.</p>
+          </div>
+        </div>
+      </div>
+
       {/* KPI Strip */}
       <div className="dashboard-grid">
         <div className="glass-card stat-card">
@@ -416,6 +457,47 @@ export const DashboardTeacher = ({ tab }: Props) => {
           </div>
         </div>
       )}
+      {/* PARENTAL COMMUNICATION OUTBOX (SMS / WHATSAPP QUEUE) */}
+      <div className="glass-card" style={{ padding: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Send size={18} color="var(--accent-primary)" /> Parental Communication Outbox
+            </h3>
+            <p className="text-muted" style={{ fontSize: '0.78rem' }}>Live SMS &amp; WhatsApp dispatches via mNotify Gateway Engine</p>
+          </div>
+          <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>⚡ mNotify Engine Active</span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          {(() => {
+            try {
+              const logs = JSON.parse(localStorage.getItem('sh_sms_logs') || '[]');
+              if (logs.length === 0) {
+                return (
+                  <div style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    No messages in outbox log. Use Student Profile or POS to dispatch instant SMS/WhatsApp alerts.
+                  </div>
+                );
+              }
+              return logs.slice(0, 4).map((log: any) => (
+                <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0.85rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem' }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{log.messageType.replace('_', ' ')} → {log.recipientName} ({log.recipientPhone})</div>
+                    <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: 2 }}>{log.content.slice(0, 75)}...</div>
+                  </div>
+                  <span className={`badge ${log.status === 'Delivered' ? 'badge-success' : 'badge-warning'}`}>
+                    {log.status === 'Delivered' ? 'Dispatched ✓' : 'Pending Sync'}
+                  </span>
+                </div>
+              ));
+            } catch {
+              return <p className="text-muted" style={{ fontSize: '0.82rem' }}>Outbox log empty.</p>;
+            }
+          })()}
+        </div>
+      </div>
+
       {/* STUDENT PROFILE DETAIL MODAL */}
       {viewingStudentProfile && (
         <StudentProfileModal
