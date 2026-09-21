@@ -8,9 +8,14 @@ dist/
 # Firebase cache  
 .firebase/  
   
-# Secret keys - NEVER commit  
-src/keys/  
-*.pem  
+# Secret keys - NEVER commit
+src/keys/
+*.pem
+
+# Firebase service-account keys - NEVER commit (server-only; keep out of the frontend)
+*-firebase-adminsdk-*.json
+serviceAccountKey.json
+*.firebase-adminsdk.json
   
 # Environment variables - NEVER commit  
 .env  

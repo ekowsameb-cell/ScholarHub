@@ -1,83 +1,58 @@
-const CACHE_NAME = 'scholarhub-cache-v1';
-const ASSETS_TO_CACHE = [
+// ScholarHub ERP service worker — runtime caching (works against real dist/ output).
+const CACHE_NAME = 'scholarhub-cache-v2';
+
+// Only the app shell is precached. Everything else is cached at runtime so the
+// build (hashed filenames in /assets/) is always served from cache once seen.
+const APP_SHELL = [
   '/',
   '/index.html',
-  '/src/main.tsx',
-  '/src/App.tsx',
-  '/src/index.css',
-  '/src/App.css',
-  '/src/context/AuthContext.tsx',
-  '/src/components/Sidebar.tsx',
-  '/src/components/RoleSwitcher.tsx',
-  '/src/dbAdapter.ts',
-  '/src/data/mockData.ts',
-  '/src/services/aiService.ts',
-  '/src/pages/DashboardOwner.tsx',
-  '/src/pages/DashboardHeadmaster.tsx',
-  '/src/pages/DashboardHOD.tsx',
-  '/src/pages/DashboardTeacher.tsx',
-  '/src/pages/DashboardCashier.tsx',
-  '/src/pages/DashboardParent.tsx'
+  '/manifest.webmanifest',
+  '/favicon.svg',
 ];
 
-// Install Service Worker
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Caching App Shell and dependencies');
-      return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
   );
 });
 
-// Activate Service Worker
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keyList) => {
-      return Promise.all(
-        keyList.map((key) => {
-          if (key !== CACHE_NAME) {
-            console.log('[Service Worker] Removing old cache', key);
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      )
+      .then(() => self.clients.claim())
   );
 });
 
-// Fetch Interceptor
 self.addEventListener('fetch', (event) => {
-  // Only intercept HTTP/HTTPS GET requests
-  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
+  const req = event.request;
+  if (req.method !== 'GET' || !req.url.startsWith(self.location.origin)) return;
+
+  // Navigations: network-first, fall back to the cached app shell when offline.
+  if (req.mode === 'navigate') {
+    event.respondWith(fetch(req).catch(() => caches.match('/index.html')));
     return;
   }
 
+  // Static assets: cache-first, then network (and cache the response for next time).
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Return cached response instantly
-        return cachedResponse;
-      }
-
-      // If not cached, attempt network fetch
-      return fetch(event.request)
-        .then((response) => {
-          // If response is valid, clone and cache it
-          if (response && response.status === 200 && response.type === 'basic') {
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
+    caches.match(req).then((cached) => {
+      if (cached) return cached;
+      return fetch(req)
+        .then((res) => {
+          if (res && res.status === 200 && res.type === 'basic') {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
           }
-          return response;
+          return res;
         })
-        .catch(() => {
-          // If offline and request is document (like navigation), fall back to index.html
-          if (event.request.headers.get('accept').includes('text/html')) {
-            return caches.match('/index.html');
-          }
-        });
+        .catch(() => cached);
     })
   );
 });
