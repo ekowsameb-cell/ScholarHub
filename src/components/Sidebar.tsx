@@ -25,6 +25,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return [
           { id: 'admin-students', label: 'Student Enrollment', icon: <UserPlus size={18} /> },
           { id: 'admin-staff', label: 'Staff Directory', icon: <Shield size={18} /> },
+          { id: 'admin-salary', label: 'Salary & Payroll (GRA/SSNIT)', icon: <DollarSign size={18} /> },
           { id: 'admin-overview', label: 'System Overview', icon: <Home size={18} /> },
           { id: 'admin-panel', label: 'Admin Panel', icon: <ShieldCheck size={18} /> },
           { id: 'messages', label: 'Inbox', icon: <Mail size={18} /> }
@@ -42,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'hm-overview', label: 'Executive Summary', icon: <Home size={18} /> },
           { id: 'hm-approvals', label: 'Approval Workflows', icon: <UserCheck size={18} /> },
           { id: 'hm-performance', label: 'School Performance', icon: <BarChart2 size={18} /> },
+          { id: 'hm-payslips', label: 'My Compensation Vault', icon: <DollarSign size={18} /> },
           { id: 'messages', label: 'Inbox', icon: <Mail size={18} /> }
         ];
       case 'HOD':
@@ -49,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'hod-analytics', label: 'Dept Analytics', icon: <BarChart2 size={18} /> },
           { id: 'hod-grades', label: 'Grade Distribution', icon: <Award size={18} /> },
           { id: 'hod-plans', label: 'Lesson Plan Queue', icon: <BookOpen size={18} /> },
+          { id: 'hod-payslips', label: 'My Compensation Vault', icon: <DollarSign size={18} /> },
           { id: 'messages', label: 'Inbox', icon: <Mail size={18} /> }
         ];
       case 'Teacher':
@@ -56,12 +59,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'teacher-roster', label: 'Class Roster & Attendance', icon: <ClipboardCheck size={18} /> },
           { id: 'teacher-gradebook', label: 'Score Gradebook', icon: <Award size={18} /> },
           { id: 'teacher-aipicker', label: 'AI Lesson Planner', icon: <Sparkles size={18} /> },
+          { id: 'teacher-payslips', label: 'My Compensation Vault', icon: <DollarSign size={18} /> },
           { id: 'messages', label: 'Inbox', icon: <Mail size={18} /> }
         ];
       case 'Cashier':
         return [
           { id: 'cashier-pos', label: 'Fee POS Terminal', icon: <DollarSign size={18} /> },
           { id: 'cashier-transactions', label: 'Transaction Logs', icon: <BarChart2 size={18} /> },
+          { id: 'cashier-payslips', label: 'My Compensation Vault', icon: <DollarSign size={18} /> },
           { id: 'messages', label: 'Inbox', icon: <Mail size={18} /> }
         ];
       case 'Parent':

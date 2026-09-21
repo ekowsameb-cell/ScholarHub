@@ -336,3 +336,299 @@ export const mockAnnouncements: Announcement[] = [
     timestamp: '2026-08-17T14:20:00Z'
   }
 ];
+
+// ==========================================================================
+// STATUTORY PAYROLL & COMPENSATION DATA STRUCTURES (SSNIT & GRA COMPLIANT)
+// ==========================================================================
+
+export interface StaffCompensationProfile {
+  id: string;
+  staffId: string; // User.uid
+  firstName: string;
+  lastName: string;
+  staffName: string;
+  role: string;
+  department: string;
+  staffIdNumber: string; // e.g. "TCH-2026-004"
+  graTin: string;        // Mandatory GRA TIN
+  ssnitNumber: string;   // Mandatory SSNIT ID
+  bankName: string;
+  bankBranch: string;
+  accountNumber: string;
+  basicSalary: number;   // Anchored to SSNIT floor (>= 587.79)
+  allowancesTaxable: number;
+  allowancesNonTaxable: number;
+  updatedAt: string;
+}
+
+export interface SalaryApprovalRequest {
+  id: string;
+  profileId: string;
+  staffId: string;
+  staffName: string;
+  staffIdNumber: string;
+  department: string;
+  requestedBy: string; // Admin/HR user ID
+  currentBase: number;
+  proposedBase: number;
+  proposedAllowancesTaxable: number;
+  justification: string;
+  status: 'Pending_Owner_Review' | 'Approved_By_Owner' | 'Rejected_By_Owner';
+  ownerId?: string;
+  ownerRemarks?: string;
+  createdAt: string;
+  actionedAt?: string;
+}
+
+export interface PayrollHistoricalLedgerItem {
+  id: string;
+  staffId: string;
+  staffName: string;
+  staffIdNumber: string;
+  role: string;
+  department: string;
+  graTin: string;
+  ssnitNumber: string;
+  bankName: string;
+  bankBranch?: string;
+  accountNumber: string;
+  payPeriodMonthYear: string; // e.g. "2026-09"
+  periodName: string;         // e.g. "September 2026"
+  basicSalarySnapshot: number;
+  taxableAllowancesSnapshot: number;
+  nonTaxableAllowancesSnapshot: number;
+  grossSalary: number;
+  deductionSsnitEmployee: number; // 5.5%
+  contributionSsnitEmployer: number; // 13.0%
+  graPayeWithheld: number;
+  otherDeductionsWelfare: number;
+  netSalaryPayout: number;
+  netPayout: number; // alias for convenient display
+  generatedAt: string;
+  isPublishedToStaff: boolean;
+}
+
+export const mockCompensationProfiles: StaffCompensationProfile[] = [
+  {
+    id: 'comp-001',
+    staffId: 'u-head',
+    firstName: 'Emmanuel',
+    lastName: 'Osei',
+    staffName: 'Mr. Emmanuel Osei',
+    role: 'Headmaster',
+    department: 'Administration',
+    staffIdNumber: 'ADM-2026-001',
+    graTin: 'P000984512X',
+    ssnitNumber: 'C104592817263',
+    bankName: 'GCB Bank',
+    bankBranch: 'High Street Accra',
+    accountNumber: '1041130004567',
+    basicSalary: 8500.00,
+    allowancesTaxable: 1200.00,
+    allowancesNonTaxable: 500.00,
+    updatedAt: '2026-08-01T08:00:00Z'
+  },
+  {
+    id: 'comp-002',
+    staffId: 'u-hod-math',
+    firstName: 'Patience',
+    lastName: 'Addo',
+    staffName: 'Mrs. Patience Addo',
+    role: 'HOD',
+    department: 'dept-math',
+    staffIdNumber: 'HOD-2026-002',
+    graTin: 'P001847291Y',
+    ssnitNumber: 'C108392019482',
+    bankName: 'Ecobank Ghana',
+    bankBranch: 'Legon Main',
+    accountNumber: '0021489201941',
+    basicSalary: 6200.00,
+    allowancesTaxable: 800.00,
+    allowancesNonTaxable: 350.00,
+    updatedAt: '2026-08-01T08:00:00Z'
+  },
+  {
+    id: 'comp-003',
+    staffId: 'u-hod-science',
+    firstName: 'Kwame',
+    lastName: 'Boateng',
+    staffName: 'Mr. Kwame Boateng',
+    role: 'HOD',
+    department: 'dept-science',
+    staffIdNumber: 'HOD-2026-003',
+    graTin: 'P002948172Z',
+    ssnitNumber: 'C109482716354',
+    bankName: 'Fidelity Bank',
+    bankBranch: 'Airport City',
+    accountNumber: '2049182736451',
+    basicSalary: 6200.00,
+    allowancesTaxable: 800.00,
+    allowancesNonTaxable: 350.00,
+    updatedAt: '2026-08-01T08:00:00Z'
+  },
+  {
+    id: 'comp-004',
+    staffId: 'u-teacher1',
+    firstName: 'Joseph',
+    lastName: 'Lamptey',
+    staffName: 'Mr. Joseph Lamptey',
+    role: 'Teacher',
+    department: 'dept-math',
+    staffIdNumber: 'TCH-2026-004',
+    graTin: 'P003847291A',
+    ssnitNumber: 'C103948271625',
+    bankName: 'Absa Ghana',
+    bankBranch: 'Circle Branch',
+    accountNumber: '0482910492817',
+    basicSalary: 4500.00,
+    allowancesTaxable: 500.00,
+    allowancesNonTaxable: 200.00,
+    updatedAt: '2026-08-01T08:00:00Z'
+  },
+  {
+    id: 'comp-005',
+    staffId: 'u-teacher2',
+    firstName: 'Regina',
+    lastName: 'Appiah',
+    staffName: 'Miss Regina Appiah',
+    role: 'Teacher',
+    department: 'dept-science',
+    staffIdNumber: 'TCH-2026-005',
+    graTin: 'P004829172B',
+    ssnitNumber: 'C107392816472',
+    bankName: 'Stanbic Bank',
+    bankBranch: 'Tema Harbour',
+    accountNumber: '9048271635482',
+    basicSalary: 4500.00,
+    allowancesTaxable: 500.00,
+    allowancesNonTaxable: 200.00,
+    updatedAt: '2026-08-01T08:00:00Z'
+  },
+  {
+    id: 'comp-006',
+    staffId: 'u-cashier',
+    firstName: 'Sarah',
+    lastName: 'Hanson',
+    staffName: 'Mrs. Sarah Hanson',
+    role: 'Cashier',
+    department: 'Finance & Accounts',
+    staffIdNumber: 'FIN-2026-006',
+    graTin: 'P005829182C',
+    ssnitNumber: 'C105839201948',
+    bankName: 'Zenith Bank',
+    bankBranch: 'Kaneshie Main',
+    accountNumber: '1092837465019',
+    basicSalary: 4200.00,
+    allowancesTaxable: 400.00,
+    allowancesNonTaxable: 200.00,
+    updatedAt: '2026-08-01T08:00:00Z'
+  },
+  {
+    id: 'comp-007',
+    staffId: 'u-admin',
+    firstName: 'System',
+    lastName: 'Administrator',
+    staffName: 'System Administrator (IT)',
+    role: 'Admin',
+    department: 'IT Systems',
+    staffIdNumber: 'IT-2026-007',
+    graTin: 'P006839201D',
+    ssnitNumber: 'C106948271536',
+    bankName: 'Standard Chartered',
+    bankBranch: 'Liberia Road',
+    accountNumber: '0100293847562',
+    basicSalary: 5500.00,
+    allowancesTaxable: 600.00,
+    allowancesNonTaxable: 300.00,
+    updatedAt: '2026-08-01T08:00:00Z'
+  }
+];
+
+export const mockSalaryApprovalRequests: SalaryApprovalRequest[] = [
+  {
+    id: 'req-sal-001',
+    profileId: 'comp-004',
+    staffId: 'u-teacher1',
+    staffName: 'Mr. Joseph Lamptey',
+    staffIdNumber: 'TCH-2026-004',
+    department: 'Mathematics',
+    requestedBy: 'u-admin',
+    currentBase: 4500.00,
+    proposedBase: 5200.00,
+    proposedAllowancesTaxable: 650.00,
+    justification: 'Completed Postgraduate Diploma in Mathematics Education (UEW) and added senior form master duties.',
+    status: 'Pending_Owner_Review',
+    createdAt: '2026-09-15T10:30:00Z'
+  },
+  {
+    id: 'req-sal-002',
+    profileId: 'comp-005',
+    staffId: 'u-teacher2',
+    staffName: 'Miss Regina Appiah',
+    staffIdNumber: 'TCH-2026-005',
+    department: 'Integrated Science',
+    requestedBy: 'u-admin',
+    currentBase: 4500.00,
+    proposedBase: 4950.00,
+    proposedAllowancesTaxable: 500.00,
+    justification: 'Annual performance index rating exceeded 92% and led science practical lab renovations.',
+    status: 'Pending_Owner_Review',
+    createdAt: '2026-09-18T14:15:00Z'
+  }
+];
+
+export const mockPayrollHistoricalLedger: PayrollHistoricalLedgerItem[] = [
+  {
+    id: 'pay-2026-08-u-teacher1',
+    staffId: 'u-teacher1',
+    staffName: 'Mr. Joseph Lamptey',
+    staffIdNumber: 'TCH-2026-004',
+    role: 'Teacher',
+    department: 'Mathematics',
+    graTin: 'P003847291A',
+    ssnitNumber: 'C103948271625',
+    bankName: 'Absa Ghana',
+    accountNumber: '0482910492817',
+    payPeriodMonthYear: '2026-08',
+    periodName: 'August 2026',
+    basicSalarySnapshot: 4500.00,
+    taxableAllowancesSnapshot: 500.00,
+    nonTaxableAllowancesSnapshot: 200.00,
+    grossSalary: 5200.00,
+    deductionSsnitEmployee: 247.50, // 5.5% of 4500
+    contributionSsnitEmployer: 585.00, // 13.0% of 4500
+    graPayeWithheld: 771.55,
+    otherDeductionsWelfare: 50.00,
+    netSalaryPayout: 4130.95,
+    netPayout: 4130.95,
+    generatedAt: '2026-08-28T16:00:00Z',
+    isPublishedToStaff: true
+  },
+  {
+    id: 'pay-2026-07-u-teacher1',
+    staffId: 'u-teacher1',
+    staffName: 'Mr. Joseph Lamptey',
+    staffIdNumber: 'TCH-2026-004',
+    role: 'Teacher',
+    department: 'Mathematics',
+    graTin: 'P003847291A',
+    ssnitNumber: 'C103948271625',
+    bankName: 'Absa Ghana',
+    accountNumber: '0482910492817',
+    payPeriodMonthYear: '2026-07',
+    periodName: 'July 2026',
+    basicSalarySnapshot: 4500.00,
+    taxableAllowancesSnapshot: 500.00,
+    nonTaxableAllowancesSnapshot: 200.00,
+    grossSalary: 5200.00,
+    deductionSsnitEmployee: 247.50,
+    contributionSsnitEmployer: 585.00,
+    graPayeWithheld: 771.55,
+    otherDeductionsWelfare: 50.00,
+    netSalaryPayout: 4130.95,
+    netPayout: 4130.95,
+    generatedAt: '2026-07-28T16:00:00Z',
+    isPublishedToStaff: true
+  }
+];
+

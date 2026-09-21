@@ -3,13 +3,14 @@ import {
   dbGetStudents, dbGetSubjects, dbGetGrades, dbSaveGrade,
   dbGetAttendance, dbSaveAttendance, dbGetLessonPlans,
   dbSaveLessonPlan, dbSubmitLessonPlanApproval, dbGetUsers,
-  dbGetTimetableSlots, dbGetClasses
+  dbGetTimetableSlots, dbGetClasses, dbGetPayrollLedger
 } from '../dbAdapter';
-import type { Student, Subject, Grade, LessonPlan, TimetableSlot } from '../data/mockData';
+import type { Student, Subject, Grade, LessonPlan, TimetableSlot, PayrollHistoricalLedgerItem } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { StudentActivityPicker } from '../components/StudentActivityPicker';
 import { StudentProfileModal } from '../components/StudentProfileModal';
-import { Users, BookOpen, ClipboardCheck, CheckCircle, Send, FileText, PenLine, Calendar, Eye } from 'lucide-react';
+import { StaffPayslipVault } from '../components/StaffPayslipVault';
+import { Users, BookOpen, ClipboardCheck, CheckCircle, Send, FileText, PenLine, Calendar, Eye, DollarSign } from 'lucide-react';
 import { generateTeacherReport } from '../utils/reportGenerator';
 
 interface Props { tab: string; }
@@ -34,7 +35,8 @@ export const DashboardTeacher = ({ tab }: Props) => {
   const [planContent, setPlanContent] = useState('');
   const [planGenerating, setPlanGenerating] = useState(false);
   const [planSaving, setPlanSaving] = useState(false);
-  const [activeSection, setActiveSection] = useState<'attendance' | 'grades' | 'plans' | 'timetable'>('attendance');
+  const [activeSection, setActiveSection] = useState<'attendance' | 'grades' | 'plans' | 'timetable' | 'payslips'>('attendance');
+  const [payslips, setPayslips] = useState<PayrollHistoricalLedgerItem[]>([]);
 
   const reload = () => {
     const mySubjects = dbGetSubjects().filter(s => s.teacherId === currentUser?.uid);
@@ -45,9 +47,15 @@ export const DashboardTeacher = ({ tab }: Props) => {
     setGrades(dbGetGrades());
     setPlans(dbGetLessonPlans().filter(p => p.teacherId === currentUser?.uid));
     setTimetableSlots(dbGetTimetableSlots().filter(s => s.teacherId === currentUser?.uid));
+    setPayslips(dbGetPayrollLedger(currentUser?.uid));
   };
 
-  useEffect(() => { reload(); }, [currentUser?.uid, tab]);
+  useEffect(() => {
+    reload();
+    if (tab === 'teacher-payslips') {
+      setActiveSection('payslips');
+    }
+  }, [currentUser?.uid, tab]);
 
   // Pre-fill attendance from saved records
   useEffect(() => {
@@ -233,7 +241,7 @@ export const DashboardTeacher = ({ tab }: Props) => {
       </div>
 
       {/* Section Nav */}
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
         <button style={navStyle(activeSection === 'attendance')} onClick={() => setActiveSection('attendance')}>
           <ClipboardCheck size={15} style={{ marginRight: '0.4rem' }} /> Attendance
         </button>
@@ -246,7 +254,15 @@ export const DashboardTeacher = ({ tab }: Props) => {
         <button style={navStyle(activeSection === 'timetable')} onClick={() => setActiveSection('timetable')}>
           <Calendar size={15} style={{ marginRight: '0.4rem' }} /> My Weekly Timetable
         </button>
+        <button style={navStyle(activeSection === 'payslips')} onClick={() => setActiveSection('payslips')}>
+          <DollarSign size={15} style={{ marginRight: '0.4rem' }} /> My Compensation Vault
+        </button>
       </div>
+
+      {/* PAYSLIP VAULT SECTION */}
+      {activeSection === 'payslips' && (
+        <StaffPayslipVault payslipHistory={payslips} />
+      )}
 
       {/* ATTENDANCE SECTION */}
       {activeSection === 'attendance' && (

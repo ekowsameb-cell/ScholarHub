@@ -8,12 +8,15 @@ import {
   mockUsers, mockStudents, mockClasses, mockSubjects, mockGrades,
   mockAttendance, mockFeeTransactions, mockLessonPlans, mockTasks,
   mockApprovals, mockTimetableSlots, mockMessages, mockAnnouncements, calculateWAECGrade,
+  mockCompensationProfiles, mockSalaryApprovalRequests, mockPayrollHistoricalLedger,
   // Type imports
   type User, type Student, type Class, type Subject, type Grade,
   type AttendanceRecord, type FeeTransaction, type LessonPlan,
   type Task, type ApprovalRequest, type TimetableSlot,
   type ChatMessage, type Announcement,
+  type StaffCompensationProfile, type SalaryApprovalRequest, type PayrollHistoricalLedgerItem
 } from './data/mockData';
+import { calculateGhanaPayroll } from './utils/payrollCompliance';
 
 
 // Safe localStorage initialization wrapper
@@ -56,6 +59,9 @@ export const dbInit = () => {
   getOrInit<TimetableSlot>('sh_timetable', mockTimetableSlots);
   getOrInit<ChatMessage>('sh_messages', mockMessages);
   getOrInit<Announcement>('sh_announcements', mockAnnouncements);
+  getOrInit<StaffCompensationProfile>('sh_compensation_profiles', mockCompensationProfiles);
+  getOrInit<SalaryApprovalRequest>('sh_salary_approvals', mockSalaryApprovalRequests);
+  getOrInit<PayrollHistoricalLedgerItem>('sh_payroll_ledger', mockPayrollHistoricalLedger);
 };
 
 // Initialize DB immediately
@@ -65,18 +71,21 @@ dbInit();
 // Firestore collection name map  (localStorage key → Firestore collection)
 // -----------------------------------------------------------------------
 const COLLECTION_MAP: Record<string, string> = {
-  sh_users:          'users',
-  sh_students:       'students',
-  sh_classes:        'classes',
-  sh_subjects:       'subjects',
-  sh_grades:         'grades',
-  sh_attendance:     'attendance',
-  sh_feeTransactions:'feeTransactions',
-  sh_lessonPlans:    'lessonPlans',
-  sh_approvals:      'approvals',
-  sh_tasks:          'tasks',
-  sh_timetable:      'timetable',
-  sh_assignments:    'assignments',
+  sh_users:                 'users',
+  sh_students:              'students',
+  sh_classes:               'classes',
+  sh_subjects:              'subjects',
+  sh_grades:                'grades',
+  sh_attendance:            'attendance',
+  sh_feeTransactions:       'feeTransactions',
+  sh_lessonPlans:           'lessonPlans',
+  sh_approvals:             'approvals',
+  sh_tasks:                 'tasks',
+  sh_timetable:             'timetable',
+  sh_assignments:           'assignments',
+  sh_compensation_profiles: 'compensationProfiles',
+  sh_salary_approvals:      'salaryApprovals',
+  sh_payroll_ledger:        'payrollLedger',
 };
 
 /** Returns the best document ID for an item (checks common id fields). */
@@ -698,3 +707,172 @@ export const dbPostAnnouncement = async (ann: Omit<Announcement, 'id' | 'timesta
 
   return newAnn;
 };
+
+// ==========================================================================
+// STATUTORY PAYROLL & COMPENSATION DATABASE METHODS
+// ==========================================================================
+
+export const dbGetCompensationProfiles = (): StaffCompensationProfile[] => {
+  return getList<StaffCompensationProfile>('sh_compensation_profiles');
+};
+
+export const dbGetCompensationProfile = (staffId: string): StaffCompensationProfile | undefined => {
+  const profiles = dbGetCompensationProfiles();
+  return profiles.find(p => p.staffId === staffId);
+};
+
+export const dbUpdateCompensationProfile = (updated: StaffCompensationProfile): void => {
+  const profiles = dbGetCompensationProfiles();
+  const idx = profiles.findIndex(p => p.id === updated.id || p.staffId === updated.staffId);
+  if (idx !== -1) {
+    profiles[idx] = { ...updated, updatedAt: new Date().toISOString() };
+  } else {
+    profiles.push({ ...updated, updatedAt: new Date().toISOString() });
+  }
+  saveList('sh_compensation_profiles', profiles);
+  window.dispatchEvent(new Event('sh_data_updated'));
+};
+
+export const dbGetSalaryApprovalRequests = (): SalaryApprovalRequest[] => {
+  return getList<SalaryApprovalRequest>('sh_salary_approvals');
+};
+
+export const dbSubmitSalaryApprovalRequest = (
+  reqData: Omit<SalaryApprovalRequest, 'id' | 'createdAt' | 'status'>
+): SalaryApprovalRequest => {
+  const requests = dbGetSalaryApprovalRequests();
+  const newReq: SalaryApprovalRequest = {
+    ...reqData,
+    id: `req-sal-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    status: 'Pending_Owner_Review',
+    createdAt: new Date().toISOString()
+  };
+  requests.unshift(newReq);
+  saveList('sh_salary_approvals', requests);
+  window.dispatchEvent(new Event('sh_data_updated'));
+  return newReq;
+};
+
+export const dbProcessSalaryApprovalRequest = (
+  requestId: string,
+  status: 'Approved_By_Owner' | 'Rejected_By_Owner',
+  ownerId: string,
+  ownerRemarks?: string
+): void => {
+  const requests = dbGetSalaryApprovalRequests();
+  const targetReq = requests.find(r => r.id === requestId);
+  if (!targetReq) return;
+
+  targetReq.status = status;
+  targetReq.ownerId = ownerId;
+  targetReq.ownerRemarks = ownerRemarks || (status === 'Approved_By_Owner' ? 'Approved by Proprietor' : 'Declined by Proprietor');
+  targetReq.actionedAt = new Date().toISOString();
+
+  // If approved, dynamically update the Staff Compensation Profile!
+  if (status === 'Approved_By_Owner') {
+    const profiles = dbGetCompensationProfiles();
+    const prof = profiles.find(p => p.id === targetReq.profileId || p.staffId === targetReq.staffId);
+    if (prof) {
+      prof.basicSalary = targetReq.proposedBase;
+      if (targetReq.proposedAllowancesTaxable !== undefined) {
+        prof.allowancesTaxable = targetReq.proposedAllowancesTaxable;
+      }
+      prof.updatedAt = new Date().toISOString();
+      saveList('sh_compensation_profiles', profiles);
+    }
+  }
+
+  saveList('sh_salary_approvals', requests);
+  window.dispatchEvent(new Event('sh_data_updated'));
+};
+
+export const dbGetPayrollLedger = (staffId?: string): PayrollHistoricalLedgerItem[] => {
+  const ledger = getList<PayrollHistoricalLedgerItem>('sh_payroll_ledger');
+  if (staffId) {
+    return ledger.filter(l => l.staffId === staffId);
+  }
+  return ledger;
+};
+
+/**
+ * Runs the Ghana GRA & SSNIT Act 766 Statutory Payroll Calculation Engine
+ * for all active staff profiles for a designated pay period.
+ */
+export const dbRunMonthlyPayrollEngine = (
+  payPeriodMonthYear: string, // e.g. "2026-09"
+  periodName: string          // e.g. "September 2026"
+): { processedCount: number; totalGross: number; totalNet: number; totalSsnit: number; totalTax: number } => {
+  const profiles = dbGetCompensationProfiles();
+  const ledger = dbGetPayrollLedger();
+
+  let totalGross = 0;
+  let totalNet = 0;
+  let totalSsnit = 0;
+  let totalTax = 0;
+  let processedCount = 0;
+
+  profiles.forEach(prof => {
+    // Calculate statutory compliance values
+    const calc = calculateGhanaPayroll({
+      basicSalary: prof.basicSalary,
+      allowancesTaxable: prof.allowancesTaxable,
+      allowancesNonTaxable: prof.allowancesNonTaxable,
+      welfareDeductions: 50.00 // Standard staff welfare fund
+    });
+
+    totalGross += calc.grossSalary;
+    totalNet += calc.netSalaryPayout;
+    totalSsnit += calc.totalSsnitLiability;
+    totalTax += calc.graPayeWithheld;
+    processedCount++;
+
+    const ledgerItemId = `pay-${payPeriodMonthYear}-${prof.staffId}`;
+    const ledgerItem: PayrollHistoricalLedgerItem = {
+      id: ledgerItemId,
+      staffId: prof.staffId,
+      staffName: prof.staffName,
+      staffIdNumber: prof.staffIdNumber,
+      role: prof.role,
+      department: prof.department,
+      graTin: prof.graTin,
+      ssnitNumber: prof.ssnitNumber,
+      bankName: prof.bankName,
+      bankBranch: prof.bankBranch,
+      accountNumber: prof.accountNumber,
+      payPeriodMonthYear,
+      periodName,
+      basicSalarySnapshot: calc.basicSalary,
+      taxableAllowancesSnapshot: calc.allowancesTaxable,
+      nonTaxableAllowancesSnapshot: calc.allowancesNonTaxable,
+      grossSalary: calc.grossSalary,
+      deductionSsnitEmployee: calc.deductionSsnitEmployee,
+      contributionSsnitEmployer: calc.contributionSsnitEmployer,
+      graPayeWithheld: calc.graPayeWithheld,
+      otherDeductionsWelfare: calc.otherDeductionsWelfare,
+      netSalaryPayout: calc.netSalaryPayout,
+      netPayout: calc.netSalaryPayout,
+      generatedAt: new Date().toISOString(),
+      isPublishedToStaff: true
+    };
+
+    // Upsert into immutable historical ledger
+    const existingIdx = ledger.findIndex(l => l.staffId === prof.staffId && l.payPeriodMonthYear === payPeriodMonthYear);
+    if (existingIdx !== -1) {
+      ledger[existingIdx] = ledgerItem;
+    } else {
+      ledger.unshift(ledgerItem);
+    }
+  });
+
+  saveList('sh_payroll_ledger', ledger);
+  window.dispatchEvent(new Event('sh_data_updated'));
+
+  return {
+    processedCount,
+    totalGross: Math.round(totalGross * 100) / 100,
+    totalNet: Math.round(totalNet * 100) / 100,
+    totalSsnit: Math.round(totalSsnit * 100) / 100,
+    totalTax: Math.round(totalTax * 100) / 100
+  };
+};
+

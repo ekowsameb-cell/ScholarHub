@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import {
   dbGetStudents, dbGetTransactions, dbGetUsers,
   dbGetClasses, dbGetGrades, dbGetApprovals,
-  dbApproveRequest, dbRejectRequest
+  dbApproveRequest, dbRejectRequest, dbGetSalaryApprovalRequests
 } from '../dbAdapter';
 import { StudentActivityPicker } from '../components/StudentActivityPicker';
-import type { FeeTransaction, Student } from '../data/mockData';
+import { OwnerApprovalSection } from '../components/OwnerApprovalSection';
+import type { FeeTransaction, Student, SalaryApprovalRequest } from '../data/mockData';
 import { TrendingUp, Users, BookOpen, AlertCircle, DollarSign, CheckCircle, Clock, XCircle, FileText } from 'lucide-react';
 import { generateOwnerReport } from '../utils/reportGenerator';
 
@@ -15,11 +16,17 @@ export const DashboardOwner = ({ tab }: Props) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [transactions, setTransactions] = useState<FeeTransaction[]>([]);
   const [approvals, setApprovals] = useState(dbGetApprovals());
+  const [salaryApprovals, setSalaryApprovals] = useState<SalaryApprovalRequest[]>([]);
 
-  useEffect(() => {
+  const reload = () => {
     setStudents(dbGetStudents());
     setTransactions(dbGetTransactions());
     setApprovals(dbGetApprovals());
+    setSalaryApprovals(dbGetSalaryApprovalRequests());
+  };
+
+  useEffect(() => {
+    reload();
   }, [tab]);
 
   const totalRevenue = transactions.reduce((s, t) => s + t.amountPaid, 0);
@@ -56,6 +63,9 @@ export const DashboardOwner = ({ tab }: Props) => {
           <FileText size={16} /> 📄 Generate Executive Audit Report
         </button>
       </div>
+
+      {/* Executive Payroll Authorization Board (Proprietor Action Required) */}
+      <OwnerApprovalSection pendingRequests={salaryApprovals} onReload={reload} />
 
       {/* Student Activity Picker for Owner */}
       <StudentActivityPicker role="Owner" />

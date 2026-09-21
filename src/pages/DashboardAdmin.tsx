@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import {
   dbGetStudents, dbGetUsers, dbUpdateStudent, dbUpdateUser, dbGetClasses,
   dbSubmitStudentEnrollmentApproval, dbSubmitStaffRegistrationApproval, dbGetApprovals,
-  dbGetSubjects, dbGetTimetableSlots, dbGenerateTimetable
+  dbGetSubjects, dbGetTimetableSlots, dbGenerateTimetable,
+  dbGetCompensationProfiles, dbGetSalaryApprovalRequests
 } from '../dbAdapter';
-import type { Student, User, ApprovalRequest, Subject, TimetableSlot } from '../data/mockData';
+import type { Student, User, ApprovalRequest, Subject, TimetableSlot, StaffCompensationProfile, SalaryApprovalRequest } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
 import { StudentActivityPicker } from '../components/StudentActivityPicker';
 import { StudentProfileModal } from '../components/StudentProfileModal';
-import { UserPlus, Users, Search, CheckCircle, Shield, Phone, Mail, Edit, Send, Calendar, Zap, BookOpen, Eye, MessageSquare, FileText } from 'lucide-react';
+import { AdminSalaryPortal } from '../components/AdminSalaryPortal';
+import { UserPlus, Users, Search, CheckCircle, Shield, Phone, Mail, Edit, Send, Calendar, Zap, BookOpen, Eye, MessageSquare, FileText, DollarSign } from 'lucide-react';
 import { generateAdminReport } from '../utils/reportGenerator';
 
 interface Props { tab: string; }
@@ -23,6 +25,9 @@ export const DashboardAdmin = ({ tab }: Props) => {
   const [selectedTeacherFilter, setSelectedTeacherFilter] = useState<string>('all');
   const [searchStudent, setSearchStudent] = useState('');
   const [searchStaff, setSearchStaff] = useState('');
+  const [staffProfiles, setStaffProfiles] = useState<StaffCompensationProfile[]>([]);
+  const [salaryApprovals, setSalaryApprovals] = useState<SalaryApprovalRequest[]>([]);
+  const [adminSubTab, setAdminSubTab] = useState<'operations' | 'payroll'>('operations');
 
   // Notifications
   const [notifyMsg, setNotifyMsg] = useState<string | null>(null);
@@ -57,9 +62,16 @@ export const DashboardAdmin = ({ tab }: Props) => {
     setSubjects(dbGetSubjects());
     setApprovals(dbGetApprovals());
     setTimetableSlots(dbGetTimetableSlots());
+    setStaffProfiles(dbGetCompensationProfiles());
+    setSalaryApprovals(dbGetSalaryApprovalRequests());
   };
 
-  useEffect(() => { reload(); }, [tab]);
+  useEffect(() => {
+    reload();
+    if (tab === 'admin-salary') {
+      setAdminSubTab('payroll');
+    }
+  }, [tab]);
 
   // Submit Student Enrollment for Higher Authority Approval
   const handleEnrollStudent = (e: React.FormEvent) => {
@@ -185,8 +197,34 @@ export const DashboardAdmin = ({ tab }: Props) => {
         </div>
       )}
 
-      {/* Operational & Statutory Gateway Widgets */}
-      <div className="dashboard-grid">
+      {/* Sub-view Switcher: Operations vs Statutory Payroll */}
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setAdminSubTab('operations')}
+          className={`btn ${adminSubTab === 'operations' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+        >
+          <Users size={16} /> Operations &amp; Onboarding
+        </button>
+        <button
+          onClick={() => setAdminSubTab('payroll')}
+          className={`btn ${adminSubTab === 'payroll' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+        >
+          <DollarSign size={16} /> Salary Administration &amp; Statutory Payroll (Act 766 / GRA)
+        </button>
+      </div>
+
+      {adminSubTab === 'payroll' ? (
+        <AdminSalaryPortal
+          pendingApprovals={salaryApprovals}
+          staffProfiles={staffProfiles}
+          onReload={reload}
+        />
+      ) : (
+        <>
+          {/* Operational & Statutory Gateway Widgets */}
+          <div className="dashboard-grid">
         <div className="glass-card stat-card">
           <div className="stat-icon" style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)' }}><Users size={22} color="#fff" /></div>
           <div>
@@ -779,6 +817,8 @@ export const DashboardAdmin = ({ tab }: Props) => {
             </form>
           </div>
         </div>
+      )}
+        </>
       )}
       {/* STUDENT PROFILE DETAIL MODAL */}
       {viewingStudentProfile && (

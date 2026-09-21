@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { dbGetUsers, dbGetSubjects, dbGetClasses } from '../dbAdapter';
-import type { User } from '../data/mockData';
+import { dbGetUsers, dbGetSubjects, dbGetClasses, dbGetCompensationProfile, dbGetPayrollLedger } from '../dbAdapter';
+import type { User, StaffCompensationProfile, PayrollHistoricalLedgerItem } from '../data/mockData';
 import { ProfilePictureUploader } from '../components/ProfilePictureUploader';
+import { StaffPayslipVault } from '../components/StaffPayslipVault';
 import {
   User as UserIcon, Mail, Phone, Shield, BookOpen,
-  Building2, CheckCircle, XCircle, Calendar
+  Building2, CheckCircle, XCircle, Calendar, Landmark
 } from 'lucide-react';
 
 const InfoRow: React.FC<{ icon: React.ReactNode; label: string; value: string | React.ReactNode }> = ({ icon, label, value }) => (
@@ -27,11 +28,17 @@ const InfoRow: React.FC<{ icon: React.ReactNode; label: string; value: string | 
 export const StaffProfile: React.FC = () => {
   const { currentUser } = useAuth();
   const [profile, setProfile] = useState<User | null>(null);
+  const [compProfile, setCompProfile] = useState<StaffCompensationProfile | null>(null);
+  const [payslips, setPayslips] = useState<PayrollHistoricalLedgerItem[]>([]);
   const [avatarKey, setAvatarKey] = useState(0);
 
   const reload = () => {
     const u = dbGetUsers().find(u => u.uid === currentUser?.uid);
     setProfile(u || null);
+    if (currentUser?.uid) {
+      setCompProfile(dbGetCompensationProfile(currentUser.uid) || null);
+      setPayslips(dbGetPayrollLedger(currentUser.uid));
+    }
   };
 
   useEffect(() => { reload(); }, [currentUser?.uid]);
@@ -54,7 +61,7 @@ export const StaffProfile: React.FC = () => {
   const roleColor = roleColors[profile.role] || '#6366f1';
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: '760px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="animate-fade-in" style={{ maxWidth: '850px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header Banner */}
       <div className="glass-card" style={{
         padding: '2rem',
@@ -104,7 +111,7 @@ export const StaffProfile: React.FC = () => {
               </span>
             </div>
             <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '0.5rem' }}>
-              Staff ID: <code style={{ color: 'var(--accent-primary)' }}>{profile.uid}</code>
+              Staff ID: <code style={{ color: 'var(--accent-primary)' }}>{compProfile?.staffIdNumber || profile.uid}</code>
             </p>
           </div>
         </div>
@@ -132,17 +139,47 @@ export const StaffProfile: React.FC = () => {
           {assignedClass && (
             <InfoRow icon={<Calendar size={16} />} label="Assigned Class" value={assignedClass.name} />
           )}
-          <InfoRow
-            icon={profile.isActive ? <CheckCircle size={16} color="#10b981" /> : <XCircle size={16} color="#ef4444" />}
-            label="Account Status"
-            value={
-              <span style={{ color: profile.isActive ? '#10b981' : '#ef4444', fontWeight: 700 }}>
-                {profile.isActive ? 'Active' : 'Pending Activation'}
-              </span>
-            }
-          />
         </div>
       </div>
+
+      {/* Statutory Compensation Profile (SSNIT Act 766 & GRA Tax ID) */}
+      {compProfile && (
+        <div className="glass-card" style={{ padding: '1.5rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Landmark size={18} color="var(--accent-primary)" /> Statutory Compensation Profile (GRA &amp; SSNIT Act 766)
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div style={{ padding: '0.85rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+              <div className="text-muted" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>GRA TIN</div>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem', fontFamily: 'monospace', marginTop: 2 }}>{compProfile.graTin}</div>
+            </div>
+            <div style={{ padding: '0.85rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+              <div className="text-muted" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>SSNIT Number</div>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem', fontFamily: 'monospace', marginTop: 2 }}>{compProfile.ssnitNumber}</div>
+            </div>
+            <div style={{ padding: '0.85rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+              <div className="text-muted" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Bank Account</div>
+              <div style={{ fontWeight: 700, fontSize: '0.88rem', marginTop: 2 }}>{compProfile.bankName}</div>
+              <div className="text-muted" style={{ fontSize: '0.75rem' }}>{compProfile.accountNumber} ({compProfile.bankBranch})</div>
+            </div>
+            <div style={{ padding: '0.85rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+              <div className="text-muted" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Monthly Basic Salary</div>
+              <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--accent-primary)', marginTop: 2 }}>
+                GH₵ {compProfile.basicSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-muted" style={{ fontSize: '0.72rem' }}>+ Allowances: GH₵ {(compProfile.allowancesTaxable + compProfile.allowancesNonTaxable).toFixed(2)}</div>
+            </div>
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', background: 'rgba(99,102,241,0.06)', padding: '0.65rem 0.85rem', borderRadius: '4px' }}>
+            🔒 Statutory Pension: 5.5% Employee SSNIT deducted at source + 13.0% Employer SSNIT remitted monthly.
+          </div>
+        </div>
+      )}
+
+      {/* Payslip Vault Section */}
+      {profile.role !== 'Parent' && (
+        <StaffPayslipVault payslipHistory={payslips} />
+      )}
 
       {/* Read-only notice */}
       <div style={{
@@ -156,7 +193,7 @@ export const StaffProfile: React.FC = () => {
         alignItems: 'center',
         gap: '0.5rem'
       }}>
-        🔒 To update your personal details, please contact the Admin or submit a request to your Headmaster.
+        🔒 To update your personal or banking details, please contact the Admin or submit a request to your Headmaster.
       </div>
     </div>
   );
