@@ -16,6 +16,14 @@ import {
   type ChatMessage, type Announcement,
   type StaffCompensationProfile, type SalaryApprovalRequest, type PayrollHistoricalLedgerItem
 } from './data/mockData';
+import {
+  DEFAULT_TENANT, STANDARD_GHANA_COA, MOCK_TAX_RATES, MOCK_FISCAL_PERIODS,
+  MOCK_INVOICES, MOCK_PAYMENTS, MOCK_EXPENSES, MOCK_SUPPLIER_BILLS,
+  MOCK_JOURNAL_ENTRIES, MOCK_AUDIT_LOGS,
+  type Tenant, type COAItem, type JournalEntry, type UFEInvoice,
+  type UFEPayment, type UFEExpense, type UFESupplierBill, type UFETaxRate,
+  type FiscalPeriod, type AuditLog
+} from './data/ufeMockData';
 import { calculateGhanaPayroll } from './utils/payrollCompliance';
 
 
@@ -62,6 +70,17 @@ export const dbInit = () => {
   getOrInit<StaffCompensationProfile>('sh_compensation_profiles', mockCompensationProfiles);
   getOrInit<SalaryApprovalRequest>('sh_salary_approvals', mockSalaryApprovalRequests);
   getOrInit<PayrollHistoricalLedgerItem>('sh_payroll_ledger', mockPayrollHistoricalLedger);
+  // UFE Core Engine Initializers
+  getOrInit<Tenant>('sh_tenant', [DEFAULT_TENANT]);
+  getOrInit<COAItem>('sh_chart_of_accounts', STANDARD_GHANA_COA);
+  getOrInit<UFETaxRate>('sh_tax_rates', MOCK_TAX_RATES);
+  getOrInit<FiscalPeriod>('sh_fiscal_periods', MOCK_FISCAL_PERIODS);
+  getOrInit<UFEInvoice>('sh_ufe_invoices', MOCK_INVOICES);
+  getOrInit<UFEPayment>('sh_ufe_payments', MOCK_PAYMENTS);
+  getOrInit<UFEExpense>('sh_ufe_expenses', MOCK_EXPENSES);
+  getOrInit<UFESupplierBill>('sh_supplier_bills', MOCK_SUPPLIER_BILLS);
+  getOrInit<JournalEntry>('sh_journal_entries', MOCK_JOURNAL_ENTRIES);
+  getOrInit<AuditLog>('sh_ufe_audit_logs', MOCK_AUDIT_LOGS);
 };
 
 // Initialize DB immediately
@@ -86,6 +105,16 @@ const COLLECTION_MAP: Record<string, string> = {
   sh_compensation_profiles: 'compensationProfiles',
   sh_salary_approvals:      'salaryApprovals',
   sh_payroll_ledger:        'payrollLedger',
+  sh_tenant:                'tenants',
+  sh_chart_of_accounts:     'chartOfAccounts',
+  sh_tax_rates:             'taxRates',
+  sh_fiscal_periods:        'fiscalPeriods',
+  sh_ufe_invoices:          'invoices',
+  sh_ufe_payments:          'payments',
+  sh_ufe_expenses:          'expenses',
+  sh_supplier_bills:        'supplierInvoices',
+  sh_journal_entries:       'journalEntries',
+  sh_ufe_audit_logs:        'auditLogs',
 };
 
 /** Returns the best document ID for an item (checks common id fields). */
@@ -93,7 +122,9 @@ const getDocId = (item: Record<string, unknown>): string | null => {
   const idFields = [
     'uid', 'studentId', 'classId', 'subjectId', 'gradeId',
     'assignmentId', 'transactionId', 'planId', 'taskId', 'approvalId',
-    'slotId', 'timetableId', 'attendanceId', 'id',
+    'slotId', 'timetableId', 'attendanceId', 'accountId', 'entryId',
+    'invoiceId', 'paymentId', 'expenseId', 'billId', 'taxRateId',
+    'periodId', 'logId', 'tenantId', 'id',
   ];
   for (const f of idFields) {
     if (item[f] && typeof item[f] === 'string') return item[f] as string;
@@ -127,8 +158,14 @@ const syncCollection = async (key: string, list: unknown[]): Promise<void> => {
 };
 
 // Local Storage Getters & Setters
-const getList = <T>(key: string): T[] => {
-  return JSON.parse(localStorage.getItem(key) || '[]');
+const getList = <T>(key: string, fallback: T[] = []): T[] => {
+  const data = localStorage.getItem(key);
+  if (!data) return fallback;
+  try {
+    return JSON.parse(data);
+  } catch {
+    return fallback;
+  }
 };
 
 /**
@@ -874,5 +911,146 @@ export const dbRunMonthlyPayrollEngine = (
     totalSsnit: Math.round(totalSsnit * 100) / 100,
     totalTax: Math.round(totalTax * 100) / 100
   };
+};
+
+// -----------------------------------------------------------------------
+// UFE (UNIVERSAL FINANCE ENGINE) DATABASE ACCESSORS
+// -----------------------------------------------------------------------
+
+export const dbGetTenant = (tenantId: string = 'school_kingsway_001'): Tenant => {
+  const tenants = getList<Tenant>('sh_tenant', [DEFAULT_TENANT]);
+  return tenants.find(t => t.tenantId === tenantId) || DEFAULT_TENANT;
+};
+
+export const dbGetCOA = (tenantId: string = 'school_kingsway_001'): COAItem[] => {
+  const list = getList<COAItem>('sh_chart_of_accounts', STANDARD_GHANA_COA);
+  return list.filter(item => item.tenantId === tenantId);
+};
+
+export const dbSaveCOA = (tenantId: string, updatedCOA: COAItem[]): void => {
+  const allCOA = getList<COAItem>('sh_chart_of_accounts', STANDARD_GHANA_COA);
+  const otherTenants = allCOA.filter(i => i.tenantId !== tenantId);
+  const newFullList = [...otherTenants, ...updatedCOA];
+  saveList('sh_chart_of_accounts', newFullList);
+  window.dispatchEvent(new Event('sh_data_updated'));
+};
+
+export const dbGetJournalEntries = (tenantId: string = 'school_kingsway_001'): JournalEntry[] => {
+  const list = getList<JournalEntry>('sh_journal_entries', MOCK_JOURNAL_ENTRIES);
+  return list.filter(item => item.tenantId === tenantId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+};
+
+export const dbSaveJournalEntry = (entry: JournalEntry): void => {
+  const list = getList<JournalEntry>('sh_journal_entries', MOCK_JOURNAL_ENTRIES);
+  const idx = list.findIndex(e => e.entryId === entry.entryId);
+  if (idx !== -1) {
+    list[idx] = entry;
+  } else {
+    list.unshift(entry);
+  }
+  saveList('sh_journal_entries', list);
+  window.dispatchEvent(new Event('sh_data_updated'));
+};
+
+export const dbGetInvoices = (tenantId: string = 'school_kingsway_001'): UFEInvoice[] => {
+  const list = getList<UFEInvoice>('sh_ufe_invoices', MOCK_INVOICES);
+  return list.filter(item => item.tenantId === tenantId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+};
+
+export const dbSaveInvoice = (invoice: UFEInvoice): void => {
+  const list = getList<UFEInvoice>('sh_ufe_invoices', MOCK_INVOICES);
+  const idx = list.findIndex(i => i.invoiceId === invoice.invoiceId);
+  if (idx !== -1) {
+    list[idx] = invoice;
+  } else {
+    list.unshift(invoice);
+  }
+  saveList('sh_ufe_invoices', list);
+  window.dispatchEvent(new Event('sh_data_updated'));
+};
+
+export const dbGetPayments = (tenantId: string = 'school_kingsway_001'): UFEPayment[] => {
+  const list = getList<UFEPayment>('sh_ufe_payments', MOCK_PAYMENTS);
+  return list.filter(item => item.tenantId === tenantId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+};
+
+export const dbSavePayment = (payment: UFEPayment): void => {
+  const list = getList<UFEPayment>('sh_ufe_payments', MOCK_PAYMENTS);
+  const idx = list.findIndex(p => p.paymentId === payment.paymentId);
+  if (idx !== -1) {
+    list[idx] = payment;
+  } else {
+    list.unshift(payment);
+  }
+  saveList('sh_ufe_payments', list);
+  window.dispatchEvent(new Event('sh_data_updated'));
+};
+
+export const dbGetExpenses = (tenantId: string = 'school_kingsway_001'): UFEExpense[] => {
+  const list = getList<UFEExpense>('sh_ufe_expenses', MOCK_EXPENSES);
+  return list.filter(item => item.tenantId === tenantId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+};
+
+export const dbSaveExpense = (expense: UFEExpense): void => {
+  const list = getList<UFEExpense>('sh_ufe_expenses', MOCK_EXPENSES);
+  const idx = list.findIndex(e => e.expenseId === expense.expenseId);
+  if (idx !== -1) {
+    list[idx] = expense;
+  } else {
+    list.unshift(expense);
+  }
+  saveList('sh_ufe_expenses', list);
+  window.dispatchEvent(new Event('sh_data_updated'));
+};
+
+export const dbGetSupplierBills = (tenantId: string = 'school_kingsway_001'): UFESupplierBill[] => {
+  const list = getList<UFESupplierBill>('sh_supplier_bills', MOCK_SUPPLIER_BILLS);
+  return list.filter(item => item.tenantId === tenantId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+};
+
+export const dbSaveSupplierBill = (bill: UFESupplierBill): void => {
+  const list = getList<UFESupplierBill>('sh_supplier_bills', MOCK_SUPPLIER_BILLS);
+  const idx = list.findIndex(b => b.billId === bill.billId);
+  if (idx !== -1) {
+    list[idx] = bill;
+  } else {
+    list.unshift(bill);
+  }
+  saveList('sh_supplier_bills', list);
+  window.dispatchEvent(new Event('sh_data_updated'));
+};
+
+export const dbGetFiscalPeriods = (tenantId: string = 'school_kingsway_001'): FiscalPeriod[] => {
+  const list = getList<FiscalPeriod>('sh_fiscal_periods', MOCK_FISCAL_PERIODS);
+  return list.filter(item => item.tenantId === tenantId);
+};
+
+export const dbSaveFiscalPeriod = (period: FiscalPeriod): void => {
+  const list = getList<FiscalPeriod>('sh_fiscal_periods', MOCK_FISCAL_PERIODS);
+  const idx = list.findIndex(p => p.periodId === period.periodId);
+  if (idx !== -1) {
+    list[idx] = period;
+  } else {
+    list.unshift(period);
+  }
+  saveList('sh_fiscal_periods', list);
+  window.dispatchEvent(new Event('sh_data_updated'));
+};
+
+export const dbGetTaxRates = (tenantId: string = 'school_kingsway_001'): UFETaxRate[] => {
+  const list = getList<UFETaxRate>('sh_tax_rates', MOCK_TAX_RATES);
+  return list.filter(item => item.tenantId === tenantId);
+};
+
+export const dbGetAuditLogs = (tenantId: string = 'school_kingsway_001'): AuditLog[] => {
+  const list = getList<AuditLog>('sh_ufe_audit_logs', MOCK_AUDIT_LOGS);
+  return list.filter(item => item.tenantId === tenantId).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+};
+
+export const dbSaveAuditLog = (log: AuditLog): void => {
+  const list = getList<AuditLog>('sh_ufe_audit_logs', MOCK_AUDIT_LOGS);
+  list.unshift(log);
+  saveList('sh_ufe_audit_logs', list);
+  window.dispatchEvent(new Event('sh_data_updated'));
 };
 

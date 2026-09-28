@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import type { User } from '../data/mockData';
 import Drawer from '@mui/material/Drawer';
-import { Home, BarChart2, Users, BookOpen, DollarSign, ClipboardCheck, Award, Sparkles, X, UserCheck, ShieldCheck, UserPlus, Shield, Mail } from 'lucide-react';
+import { Home, BarChart2, Users, BookOpen, DollarSign, ClipboardCheck, Award, Sparkles, X, UserCheck, ShieldCheck, UserPlus, Shield, Mail, Landmark } from 'lucide-react';
 
 interface SidebarProps {
   currentTab: string;
@@ -23,6 +23,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     switch (role) {
       case 'Admin':
         return [
+          { id: 'universal-finance', label: 'Universal Finance (UFE)', icon: <Landmark size={18} /> },
           { id: 'admin-students', label: 'Student Enrollment', icon: <UserPlus size={18} /> },
           { id: 'admin-staff', label: 'Staff Directory', icon: <Shield size={18} /> },
           { id: 'admin-salary', label: 'Salary & Payroll (GRA/SSNIT)', icon: <DollarSign size={18} /> },
@@ -32,6 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ];
       case 'Owner':
         return [
+          { id: 'universal-finance', label: 'Universal Finance (UFE)', icon: <Landmark size={18} /> },
           { id: 'overview', label: 'School Overview', icon: <Home size={18} /> },
           { id: 'revenue', label: 'Financial & Revenue', icon: <DollarSign size={18} /> },
           { id: 'approvals', label: 'Pending Approvals', icon: <ShieldCheck size={18} /> },
@@ -64,6 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ];
       case 'Cashier':
         return [
+          { id: 'universal-finance', label: 'Universal Finance (UFE)', icon: <Landmark size={18} /> },
           { id: 'cashier-pos', label: 'Fee POS Terminal', icon: <DollarSign size={18} /> },
           { id: 'cashier-transactions', label: 'Transaction Logs', icon: <BarChart2 size={18} /> },
           { id: 'cashier-payslips', label: 'My Compensation Vault', icon: <DollarSign size={18} /> },

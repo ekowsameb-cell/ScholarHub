@@ -12,6 +12,7 @@ import { DashboardParent } from './pages/DashboardParent';
 import { StaffProfile } from './pages/StaffProfile';
 import { Messages } from './pages/Messages';
 import { AdminPanel } from './pages/AdminPanel';
+import { UniversalFinanceEngine } from './components/UniversalFinanceEngine';
 import { Sparkles, Key, LogIn } from 'lucide-react';
 import OfflineBanner from './components/OfflineBanner';
 
@@ -127,7 +128,8 @@ const AppContent: React.FC = () => {
 
   // Render Dashboard based on role tab
   const renderDashboardContent = () => {
-    // Profile page is available for ALL roles
+    // Universal tabs available across relevant roles
+    if (currentTab === 'universal-finance') return <UniversalFinanceEngine />;
     if (currentTab === 'profile') return <StaffProfile />;
     if (currentTab === 'messages') return <Messages />;
     if (currentTab === 'admin-panel') return <AdminPanel />;
